@@ -274,31 +274,16 @@ export function Connection() {
             Connecting your ad account
           </h2>
           <p className="text-xs text-slate-500 mb-4">
-            Two environment variables, set once in Vercel. The token never reaches the browser.
+            One environment variable, set once in Vercel. The token never reaches the browser.
           </p>
 
           <ol className="space-y-4">
             {[
               {
-                title: 'Find your ad account ID',
-                body: (
-                  <>
-                    In Ads Manager the account ID sits in the account dropdown. The dashboard wants it as{' '}
-                    <span className="font-mono text-xs text-brand-300">act_123456789</span>.
-                  </>
-                ),
-                link: { href: 'https://adsmanager.facebook.com', label: 'Open Ads Manager' },
-              },
-              {
-                title: 'Create a Meta app',
-                body: <>Create an app of type <strong className="text-slate-300">Business</strong>, then add the Marketing API product to it.</>,
-                link: { href: 'https://developers.facebook.com/apps', label: 'developers.facebook.com/apps' },
-              },
-              {
                 title: 'Generate a System User token',
                 body: (
                   <>
-                    Business Settings → Users → System Users → add one → assign this ad account with{' '}
+                    Business Settings → Users → System Users → add one → assign the ad account with{' '}
                     <strong className="text-slate-300">View performance</strong> → Generate New Token with the{' '}
                     <span className="font-mono text-xs text-brand-300">ads_read</span> scope only. System User
                     tokens do not expire; Graph API Explorer tokens die within the hour.
@@ -307,13 +292,33 @@ export function Connection() {
                 link: { href: 'https://business.facebook.com/settings', label: 'Open Business Settings' },
               },
               {
-                title: 'Add both values to Vercel',
+                title: 'Add it to Vercel',
                 body: (
                   <>
-                    Project → Settings → Environment Variables. Add{' '}
-                    <span className="font-mono text-xs text-brand-300">META_ACCESS_TOKEN</span> and{' '}
-                    <span className="font-mono text-xs text-brand-300">META_AD_ACCOUNT_ID</span>, then redeploy —
-                    environment variables are read at deploy time, so an existing deployment will not pick them up.
+                    Project → Settings → Environment Variables. Add one variable named{' '}
+                    <span className="font-mono text-xs text-brand-300">META_ACCESS_TOKEN</span> and paste the token
+                    as its value. Leave every other field alone.
+                  </>
+                ),
+              },
+              {
+                title: 'Redeploy',
+                body: (
+                  <>
+                    Deployments tab → newest deployment → <strong className="text-slate-300">⋯ → Redeploy</strong>.
+                    Vercel reads environment variables at build time, so a deployment created before you added the
+                    token will not see it. This step is the most common reason setup appears to fail.
+                  </>
+                ),
+              },
+              {
+                title: 'Come back and press Retest',
+                body: (
+                  <>
+                    The ad account is already configured in the code — an account ID is not a secret. Only the
+                    token needs to be set. Override the account with{' '}
+                    <span className="font-mono text-xs text-brand-300">META_AD_ACCOUNT_ID</span> if you ever point
+                    this at a different one.
                   </>
                 ),
               },

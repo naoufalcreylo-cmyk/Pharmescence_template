@@ -16,6 +16,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const API_VERSION = 'v25.0';
 const GRAPH = `https://graph.facebook.com/${API_VERSION}`;
 
+/**
+ * The Pharmescence ad account.
+ *
+ * An ad account ID is configuration, not a credential — it appears in Ads
+ * Manager URLs and is useless to anyone without a token that has been granted
+ * access to it. Keeping it here means deployment needs exactly one secret
+ * (META_ACCESS_TOKEN) instead of two settings, which removes the most common
+ * setup mistake. Override it with META_AD_ACCOUNT_ID to point at another account.
+ */
+const DEFAULT_AD_ACCOUNT_ID = 'act_1354995341608155';
+
 /** Insight fields the dashboard consumes. All come back as strings. */
 const INSIGHT_FIELDS = [
   'spend',
@@ -114,17 +125,17 @@ async function fetchAllPages(url: string, maxPages = 10): Promise<unknown[]> {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = process.env.META_ACCESS_TOKEN;
-  const rawAccountId = process.env.META_AD_ACCOUNT_ID;
+  const rawAccountId = process.env.META_AD_ACCOUNT_ID || DEFAULT_AD_ACCOUNT_ID;
 
-  // A missing config is the normal state on GitHub Pages and on a fresh clone,
+  // A missing token is the normal state on GitHub Pages and on a fresh clone,
   // so answer with a recognisable shape the client can fall back from rather
   // than an error that looks like a bug.
-  if (!token || !rawAccountId) {
+  if (!token) {
     return res.status(503).json({
       configured: false,
       error:
-        'Live data is not configured. Set META_ACCESS_TOKEN and META_AD_ACCOUNT_ID ' +
-        'in your Vercel project settings (Settings -> Environment Variables), then redeploy.',
+        'Live data is not configured. Add META_ACCESS_TOKEN in your Vercel project ' +
+        'settings (Settings -> Environment Variables), then redeploy.',
     });
   }
 
