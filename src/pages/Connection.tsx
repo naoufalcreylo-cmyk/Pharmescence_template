@@ -9,6 +9,7 @@ import {
 import type { ConnectionState, NormalizedRow, ReachableAdAccount } from '../lib/metaApi';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier } from '../utils/formatters';
 import { Badge } from '../components/ui/Badge';
+import { useData } from '../context/DataContext';
 
 /**
  * Live data setup and diagnostics.
@@ -78,6 +79,8 @@ const ACCOUNT_STATUS: Record<number, string> = {
 };
 
 export function Connection() {
+  // The dashboard's own load status, which can differ from the credential check.
+  const { source: dashboardSource, error: dashboardError, range } = useData();
   const [state, setState] = useState<ConnectionState>({ status: 'checking' });
   const [sample, setSample] = useState<NormalizedRow | null>(null);
   const [sampleError, setSampleError] = useState<string | null>(null);
@@ -177,6 +180,39 @@ export function Connection() {
           </button>
         </div>
       </div>
+
+      {/*
+        The credential check and the dashboard's own data load are separate code
+        paths, so they can disagree: credentials fine, but some Meta request the
+        dashboard needs is failing. That combination used to be invisible —
+        the header simply read "Sample data" with no reason given.
+      */}
+      {state.status === 'connected' && (dashboardSource === 'sample' || dashboardError) && (
+        <div
+          className={clsx(
+            'card p-5',
+            dashboardSource === 'sample' ? 'border-amber-500/30 bg-amber-500/[0.06]' : 'border-rose-500/25 bg-rose-500/[0.05]',
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className={dashboardSource === 'sample' ? 'text-amber-400 mt-0.5 shrink-0' : 'text-rose-400 mt-0.5 shrink-0'} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white mb-1">
+                {dashboardSource === 'sample'
+                  ? 'Credentials work, but the dashboard is still on sample data'
+                  : 'Some Meta requests failed'}
+              </p>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                {dashboardError ?? 'The dashboard could not load live data for the selected date range.'}
+              </p>
+              <p className="text-xs text-slate-500 mt-2">
+                Selected range: {range.label} ({range.since} to {range.until}).
+                {range.preset === 'today' && ' A range of Today returns nothing until the account has delivered today.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Connected: account facts + a real number to verify */}
       {state.status === 'connected' && (
