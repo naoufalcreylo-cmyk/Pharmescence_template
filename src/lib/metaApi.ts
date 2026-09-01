@@ -306,6 +306,26 @@ export async function fetchInsightsRaw(
   return body.data ?? [];
 }
 
+export interface ReachableAdAccount {
+  id: string;
+  account_id: string;
+  name: string;
+  account_status: number;
+  currency: string;
+}
+
+/**
+ * Ad accounts this token can actually read.
+ *
+ * Used to diagnose a (#200): if the configured account is missing from this
+ * list the ID is wrong or was never granted, and if the list is empty the token
+ * has no ads access at all. Either way it turns a dead end into a fix.
+ */
+export async function fetchAdAccounts(): Promise<ReachableAdAccount[]> {
+  const body = await call<ReachableAdAccount[]>({ resource: 'adaccounts' });
+  return body.data ?? [];
+}
+
 export async function fetchEntities(resource: 'campaigns' | 'adsets' | 'ads'): Promise<MetaEntity[]> {
   const body = await call<MetaEntity[]>({ resource });
   return body.data ?? [];

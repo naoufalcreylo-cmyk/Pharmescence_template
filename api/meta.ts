@@ -220,6 +220,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
        * Status, objective and budget live on the entity edges, not on insights —
        * the dashboard joins the two by id.
        */
+      /**
+       * Which ad accounts can this token actually see?
+       *
+       * A (#200) permission error says the token cannot read the configured
+       * account, but not why — a wrong account ID and a missing grant produce
+       * the same message. Listing the reachable accounts separates the two, and
+       * usually hands the user the correct ID directly.
+       */
+      case 'adaccounts': {
+        const u = new URL(`${GRAPH}/me/adaccounts`);
+        u.searchParams.set('fields', 'id,account_id,name,account_status,currency');
+        u.searchParams.set('limit', '100');
+        u.searchParams.set('access_token', token);
+        url = u.toString();
+        break;
+      }
+
       case 'campaigns': {
         const u = new URL(`${GRAPH}/${accountId}/campaigns`);
         u.searchParams.set('fields', 'id,name,status,effective_status,objective,daily_budget,lifetime_budget,start_time,stop_time');

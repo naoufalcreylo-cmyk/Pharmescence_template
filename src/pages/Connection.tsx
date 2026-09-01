@@ -4,9 +4,9 @@ import {
   PlugZap, CheckCircle2, XCircle, AlertTriangle, RefreshCw, ExternalLink, Loader2,
 } from 'lucide-react';
 import {
-  checkConnection, fetchInsights, MetaApiError,
+  checkConnection, fetchInsights, fetchAdAccounts, MetaApiError,
 } from '../lib/metaApi';
-import type { ConnectionState, NormalizedRow } from '../lib/metaApi';
+import type { ConnectionState, NormalizedRow, ReachableAdAccount } from '../lib/metaApi';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier } from '../utils/formatters';
 import { Badge } from '../components/ui/Badge';
 
@@ -82,14 +82,29 @@ export function Connection() {
   const [sample, setSample] = useState<NormalizedRow | null>(null);
   const [sampleError, setSampleError] = useState<string | null>(null);
   const [loadingSample, setLoadingSample] = useState(false);
+  const [reachable, setReachable] = useState<ReachableAdAccount[] | null>(null);
+  const [reachableError, setReachableError] = useState<string | null>(null);
 
   const run = useCallback(async () => {
     setState({ status: 'checking' });
     setSample(null);
     setSampleError(null);
+    setReachable(null);
+    setReachableError(null);
 
     const result = await checkConnection();
     setState(result);
+
+    // A permission failure does not say whether the ID is wrong or the grant is
+    // missing. Asking which accounts the token *can* read answers that, so run
+    // it automatically rather than making the user find the query themselves.
+    if (result.status === 'error') {
+      try {
+        setReachable(await fetchAdAccounts());
+      } catch (err) {
+        setReachableError((err as MetaApiError).message);
+      }
+    }
 
     // Reaching the account proves the credentials work; pulling real insights
     // proves the data path works, which is a different failure mode.
@@ -263,6 +278,56 @@ export function Connection() {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* Which accounts can this token actually reach? */}
+      {state.status === 'error' && (
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-white mb-1">Ad accounts this token can read</h2>
+          <p className="text-xs text-slate-500 mb-4">
+            The dashboard is configured for{' '}
+            <span className="font-mono text-brand-300">act_1354995341608155</span>. If that is missing below,
+            the account ID is the problem — not the token.
+          </p>
+
+          {reachableError ? (
+            <div className="rounded-xl border border-rose-500/20 bg-rose-500/[0.06] p-4">
+              <p className="text-sm text-slate-400">{reachableError}</p>
+            </div>
+          ) : reachable === null ? (
+            <p className="text-sm text-slate-500">Checking...</p>
+          ) : reachable.length === 0 ? (
+            <div className="rounded-xl border border-rose-500/20 bg-rose-500/[0.06] p-4">
+              <p className="text-sm text-rose-400 font-medium mb-1">This token cannot read any ad account</p>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                The token is valid but carries no ads access at all. Either the{' '}
+                <span className="font-mono text-xs">ads_read</span> scope is missing, or the Facebook user it
+                belongs to has no role on any ad account. Check the Scopes line in the Token Debugger first.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {reachable.map(a => (
+                <div
+                  key={a.id}
+                  className="flex flex-wrap items-center gap-3 rounded-xl border border-bg-border bg-bg-elevated px-3.5 py-2.5"
+                >
+                  <span className="text-sm text-white font-medium flex-1 min-w-0 truncate">{a.name}</span>
+                  <span className="font-mono text-xs text-brand-300">{a.id}</span>
+                  <Badge variant={a.account_status === 1 ? 'success' : 'warning'}>
+                    {ACCOUNT_STATUS[a.account_status] ?? `Code ${a.account_status}`}
+                  </Badge>
+                  <span className="text-xs text-slate-500">{a.currency}</span>
+                </div>
+              ))}
+              <p className="text-sm text-slate-400 leading-relaxed pt-2">
+                Pick the right one above, then set{' '}
+                <span className="font-mono text-xs text-brand-300">META_AD_ACCOUNT_ID</span> in Vercel to that
+                value (including the <span className="font-mono text-xs">act_</span> prefix) and redeploy.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
