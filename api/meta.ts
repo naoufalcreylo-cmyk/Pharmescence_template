@@ -25,7 +25,7 @@ const GRAPH = `https://graph.facebook.com/${API_VERSION}`;
  * (META_ACCESS_TOKEN) instead of two settings, which removes the most common
  * setup mistake. Override it with META_AD_ACCOUNT_ID to point at another account.
  */
-const DEFAULT_AD_ACCOUNT_ID = 'act_1354995341608155';
+const DEFAULT_AD_ACCOUNT_ID = 'act_1253134272082228';
 
 /** Insight fields the dashboard consumes. All come back as strings. */
 const INSIGHT_FIELDS = [
@@ -170,6 +170,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(response.status === 200 ? 502 : response.status).json({
             configured: true,
             connected: false,
+            // Report which account was actually queried. A permission error is
+            // most often a wrong ID, and the UI cannot say so unless the server
+            // names the account it used.
+            accountId,
             error: body.error?.message ?? `Meta API returned ${response.status}`,
             metaCode: body.error?.code,
             fbtrace_id: body.error?.fbtrace_id,

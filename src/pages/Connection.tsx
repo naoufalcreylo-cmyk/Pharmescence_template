@@ -286,9 +286,15 @@ export function Connection() {
         <div className="card p-5">
           <h2 className="text-sm font-semibold text-white mb-1">Ad accounts this token can read</h2>
           <p className="text-xs text-slate-500 mb-4">
-            The dashboard is configured for{' '}
-            <span className="font-mono text-brand-300">act_1354995341608155</span>. If that is missing below,
-            the account ID is the problem — not the token.
+            {state.accountId ? (
+              <>
+                The dashboard queried{' '}
+                <span className="font-mono text-brand-300">{state.accountId}</span>. If that is missing below,
+                the account ID is the problem — not the token.
+              </>
+            ) : (
+              <>If the account the dashboard is configured for is missing below, the ID is the problem — not the token.</>
+            )}
           </p>
 
           {reachableError ? (

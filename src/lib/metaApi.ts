@@ -79,7 +79,7 @@ export interface AccountProbe {
 export type ConnectionState =
   | { status: 'checking' }
   | { status: 'not-configured'; message: string }
-  | { status: 'error'; message: string; metaCode?: number; fbtrace_id?: string }
+  | { status: 'error'; message: string; metaCode?: number; fbtrace_id?: string; accountId?: string }
   | { status: 'connected'; account: AccountProbe; apiVersion: string };
 
 // --- Parsing helpers ---------------------------------------------------------
@@ -214,6 +214,7 @@ interface ApiEnvelope<T> {
   metaCode?: number;
   fbtrace_id?: string;
   account?: AccountProbe;
+  accountId?: string;
   apiVersion?: string;
 }
 
@@ -223,6 +224,8 @@ export class MetaApiError extends Error {
     readonly metaCode?: number,
     readonly fbtrace_id?: string,
     readonly notConfigured = false,
+    /** Which ad account the server actually queried, for diagnosing a #200. */
+    readonly accountId?: string,
   ) {
     super(message);
     this.name = 'MetaApiError';
@@ -262,7 +265,7 @@ async function call<T>(params: Record<string, string>): Promise<ApiEnvelope<T>> 
     throw new MetaApiError(body.error ?? 'Live data is not configured.', undefined, undefined, true);
   }
   if (!response.ok || body.error) {
-    throw new MetaApiError(body.error ?? `Request failed (${response.status})`, body.metaCode, body.fbtrace_id);
+    throw new MetaApiError(body.error ?? `Request failed (${response.status})`, body.metaCode, body.fbtrace_id, false, body.accountId);
   }
 
   return body;
@@ -275,11 +278,11 @@ export async function checkConnection(): Promise<ConnectionState> {
     if (body.connected && body.account) {
       return { status: 'connected', account: body.account, apiVersion: body.apiVersion ?? 'unknown' };
     }
-    return { status: 'error', message: body.error ?? 'Unexpected response from the API.' };
+    return { status: 'error', message: body.error ?? 'Unexpected response from the API.', accountId: body.accountId };
   } catch (err) {
     const e = err as MetaApiError;
     if (e.notConfigured) return { status: 'not-configured', message: e.message };
-    return { status: 'error', message: e.message, metaCode: e.metaCode, fbtrace_id: e.fbtrace_id };
+    return { status: 'error', message: e.message, metaCode: e.metaCode, fbtrace_id: e.fbtrace_id, accountId: e.accountId };
   }
 }
 
