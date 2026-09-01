@@ -1,0 +1,252 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-bg-base text-white font-sans;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-bg-surface;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-brand-600;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-bg-card border border-bg-border rounded-2xl;
+  }
+
+  .card-elevated {
+    @apply bg-bg-elevated border border-bg-border rounded-2xl;
+  }
+
+  .metric-up {
+    @apply text-emerald-400;
+  }
+
+  .metric-down {
+    @apply text-rose-400;
+  }
+
+  .metric-neutral {
+    @apply text-slate-400;
+  }
+
+  .badge-active {
+    @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20;
+  }
+
+  .badge-paused {
+    @apply bg-amber-500/10 text-amber-400 border border-amber-500/20;
+  }
+
+  .badge-deleted {
+    @apply bg-rose-500/10 text-rose-400 border border-rose-500/20;
+  }
+
+  .shimmer-bg {
+    background: linear-gradient(90deg, #1E1E32 25%, #2A2A42 50%, #1E1E32 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  .table-row-hover {
+    @apply hover:bg-bg-hover transition-colors duration-150;
+  }
+
+  .glow-brand {
+    box-shadow: 0 0 30px rgba(124, 58, 237, 0.2);
+  }
+
+  .gradient-text-brand {
+    @apply bg-gradient-brand bg-clip-text text-transparent;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Recharts custom styles */
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+.recharts-default-tooltip {
+  @apply !bg-bg-elevated !border-bg-border !rounded-xl !shadow-card;
+}
+
+.recharts-cartesian-axis-tick-value {
+  @apply !fill-slate-500 !text-xs;
+}
+
+.recharts-legend-item-text {
+  @apply !text-slate-400 !text-xs;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Light theme
+   The palette lives in Tailwind as fixed dark values, so light mode remaps the
+   handful of semantic utilities the app actually uses. `html.light .x` outranks
+   the generated `.x` on specificity, so no !important is needed.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #F5F6FA;
+  color: #0F172A;
+}
+
+/* Surfaces */
+html.light .bg-bg-base { background-color: #F5F6FA; }
+html.light .bg-bg-surface { background-color: #FFFFFF; }
+html.light .bg-bg-card { background-color: #FFFFFF; }
+html.light .bg-bg-elevated { background-color: #F8FAFC; }
+html.light .bg-bg-hover { background-color: #F1F5F9; }
+html.light .bg-bg-border { background-color: #E2E8F0; }
+html.light .bg-bg-surface\/80 { background-color: rgba(255, 255, 255, 0.85); }
+html.light .bg-bg-base\/85 { background-color: rgba(255, 255, 255, 0.88); }
+html.light .bg-bg-elevated\/95 { background-color: rgba(248, 250, 252, 0.97); }
+html.light .bg-bg-elevated\/50 { background-color: rgba(241, 245, 249, 0.8); }
+
+/* Borders */
+html.light .border-bg-border { border-color: #E2E8F0; }
+html.light .border-bg-border\/50 { border-color: rgba(226, 232, 240, 0.6); }
+html.light .border-bg-border\/60 { border-color: rgba(226, 232, 240, 0.7); }
+html.light .border-bg-hover { border-color: #CBD5E1; }
+html.light .border-t-2.border-bg-border { border-color: #CBD5E1; }
+
+/* Text — the dark theme's 400-weight accents are too pale on white */
+html.light .text-white { color: #0F172A; }
+html.light .text-slate-300 { color: #334155; }
+html.light .text-slate-400 { color: #475569; }
+html.light .text-slate-500 { color: #64748B; }
+html.light .text-slate-600 { color: #94A3B8; }
+html.light .text-brand-400 { color: #6D28D9; }
+html.light .text-brand-300 { color: #7C3AED; }
+html.light .text-emerald-400 { color: #047857; }
+html.light .text-emerald-300 { color: #059669; }
+html.light .text-rose-400 { color: #BE123C; }
+html.light .text-amber-400 { color: #B45309; }
+html.light .text-cyan-400 { color: #0E7490; }
+
+/* Map basemap dots need more weight against a light ground */
+html.light .fill-slate-600\/40 { fill: rgba(100, 116, 139, 0.45); }
+
+html.light .shimmer-bg {
+  background: linear-gradient(90deg, #EEF1F6 25%, #E2E8F0 50%, #EEF1F6 75%);
+  background-size: 200% 100%;
+}
+
+html.light .card,
+html.light .card-elevated {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+html.light ::-webkit-scrollbar-track { background: #EEF1F6; }
+html.light ::-webkit-scrollbar-thumb { background: #CBD5E1; }
+
+/* Recharts renders its grid and axes as SVG with inline strokes */
+html.light .recharts-cartesian-grid line { stroke: #E2E8F0; }
+html.light .recharts-cartesian-axis-line,
+html.light .recharts-cartesian-axis-tick-line { stroke: #CBD5E1; }
+html.light .recharts-cartesian-axis-tick-value { fill: #64748B !important; }
+html.light .recharts-default-tooltip {
+  background: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+}
+
+/* ─── Print / PDF ─────────────────────────────────────────────────────────────
+   Printing forces the light surface set regardless of the on-screen theme, so a
+   dark dashboard does not come out as a page of solid ink.
+   ──────────────────────────────────────────────────────────────────────────── */
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+
+  body {
+    background: #fff !important;
+    color: #0F172A !important;
+  }
+
+  .card, .card-elevated {
+    background: #fff !important;
+    border-color: #E2E8F0 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .text-white, .text-slate-300, .text-slate-400 { color: #0F172A !important; }
+  .text-slate-500, .text-slate-600 { color: #475569 !important; }
+  .bg-bg-base, .bg-bg-surface, .bg-bg-card, .bg-bg-elevated { background: #fff !important; }
+
+  main { padding-top: 0 !important; }
+}
+
+/* Hover/group-hover variants generate their own class names, so the base-class
+   remaps above do not reach them. */
+html.light .hover\:bg-bg-hover:hover,
+html.light .group:hover .group-hover\:bg-bg-hover { background-color: #F1F5F9; }
+html.light .hover\:border-bg-hover:hover { border-color: #CBD5E1; }
+html.light .hover\:border-bg-border:hover { border-color: #E2E8F0; }
+html.light .hover\:text-white:hover { color: #0F172A; }
+
+/* White text sitting on a saturated fill must stay white — the blanket
+   .text-white remap above would otherwise put near-black on a red badge or a
+   purple button. Matching the fill and the text class together outranks it. */
+html.light .bg-brand-600.text-white,
+html.light .bg-brand-500.text-white,
+html.light .bg-rose-500.text-white,
+html.light .bg-emerald-500.text-white,
+html.light .bg-amber-500.text-white,
+html.light .bg-cyan-500.text-white,
+html.light .bg-brand-600 .text-white,
+html.light .bg-brand-500 .text-white,
+html.light .bg-rose-500 .text-white,
+html.light .bg-gradient-brand .text-white,
+html.light .bg-gradient-success .text-white,
+html.light .bg-gradient-danger .text-white,
+html.light .hover\:bg-brand-500:hover.text-white { color: #FFFFFF; }
+
+/* Medal / chip text keyed to the app background inverts in light mode */
+html.light .text-bg-base { color: #0F172A; }

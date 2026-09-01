@@ -1,0 +1,59 @@
+name: Deploy dashboard to GitHub Pages
+
+# Runs on every push to main, and can also be triggered by hand from the
+# Actions tab ("Run workflow").
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Permissions GitHub Pages needs to publish the built site.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# If you push twice quickly, cancel the older run rather than racing it.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # npm ci installs the exact versions in package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # A project site is served from https://<user>.github.io/<repo>/, not from
+      # the domain root, so the bundle has to be built with that sub-path baked
+      # in or every CSS/JS file 404s and the page renders blank. Reading the repo
+      # name from the workflow context means this keeps working if you rename it.
+      - name: Build
+        run: npm run build -- --base=/${{ github.event.repository.name }}/
+
+      - name: Upload the built site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
