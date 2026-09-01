@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { clsx } from 'clsx';
 import { CalendarDays, TrendingUp, TrendingDown } from 'lucide-react';
-import { timeSeriesData } from '../data/mockData';
+import { useData } from '../context/DataContext';
 import { groupTimeSeries } from '../data/breakdownData';
 import type { TrendPoint } from '../data/breakdownData';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier } from '../utils/formatters';
@@ -91,11 +91,12 @@ function TrendTooltip({ active, payload, label, granularity }: any) {
 
 export function Trends() {
   const { filters } = useFilters();
+  const { timeSeries } = useData();
   const [granularity, setGranularity] = useState<TrendGranularity>('daily');
   const [selected, setSelected] = useState<MetricId[]>(['spend', 'revenue', 'roas']);
 
   const points: TrendPoint[] = useMemo(
-    () => groupTimeSeries(timeSeriesData.slice(-filters.days), granularity),
+    () => groupTimeSeries(timeSeries.slice(-filters.days), granularity),
     [filters.days, granularity],
   );
 

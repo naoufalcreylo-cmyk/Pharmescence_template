@@ -1,5 +1,5 @@
 import type { Campaign, AdSet, Ad, GlobalFilters, FilterKey } from '../types';
-import { campaigns, adSets, ads, geoData, placementData } from '../data/mockData';
+import { geoData, placementData } from '../data/mockData';
 
 /**
  * Filter selectors (§18).
@@ -9,6 +9,16 @@ import { campaigns, adSets, ads, geoData, placementData } from '../data/mockData
  * placement, country) are evaluated against the ad set — the level Meta actually
  * stores targeting on — and then propagate up to campaigns and down to ads.
  */
+
+/**
+ * The entity set the filters run against. Passed in rather than imported so the
+ * same predicates work over live Meta data and the bundled sample data.
+ */
+export interface EntitySource {
+  campaigns: Campaign[];
+  adSets: AdSet[];
+  ads: Ad[];
+}
 
 export const DEFAULT_FILTERS: GlobalFilters = {
   days: 30,
@@ -51,7 +61,9 @@ function bracketOverlaps(bracket: string, min: number, max: number): boolean {
   return min <= hi && max >= lo;
 }
 
-export const FILTER_DEFS: FilterDef[] = [
+export function buildFilterDefs(source: EntitySource): FilterDef[] {
+  const { campaigns, adSets, ads } = source;
+  return [
   {
     key: 'campaigns',
     label: 'Campaign',
@@ -127,7 +139,8 @@ export const FILTER_DEFS: FilterDef[] = [
       { value: 'Tablet', label: 'Tablet' },
     ],
   },
-];
+  ];
+}
 
 const any = (selected: string[]) => selected.length === 0;
 
@@ -150,7 +163,8 @@ export interface FilteredData {
   ads: Ad[];
 }
 
-export function applyFilters(f: GlobalFilters): FilteredData {
+export function applyFilters(f: GlobalFilters, source: EntitySource): FilteredData {
+  const { campaigns, adSets, ads } = source;
   // 1. Campaign-level attributes first.
   const campaignPool = campaigns.filter(c => {
     if (!any(f.campaigns) && !f.campaigns.includes(c.id)) return false;

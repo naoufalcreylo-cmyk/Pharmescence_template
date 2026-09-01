@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ArrowDown, TrendingDown } from 'lucide-react';
-import { getFunnelData } from '../data/mockData';
+import { useData } from '../context/DataContext';
+import { computeFunnel } from '../data/derive';
 import { formatNumber, formatCurrency, formatPercent } from '../utils/formatters';
 
 interface FunnelProps {
@@ -11,7 +12,8 @@ const FUNNEL_COLORS = ['#7C3AED', '#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#
 const GRADIENT_IDS = ['f0', 'f1', 'f2', 'f3', 'f4', 'f5'];
 
 export function Funnel({ selectedDays }: FunnelProps) {
-  const steps = getFunnelData(selectedDays);
+  const { timeSeries } = useData();
+  const steps = computeFunnel(timeSeries, selectedDays);
   const maxVal = steps[0].value;
 
   return (

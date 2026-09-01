@@ -1,6 +1,7 @@
 import { Download, FileText, Table, BarChart3, Printer, Mail, Share2, Calendar, CheckSquare } from 'lucide-react';
 import { clsx } from 'clsx';
-import { campaigns, adSets, ads, getAccountKPIs } from '../data/mockData';
+import { useData } from '../context/DataContext';
+import { computeAccountKPIs } from '../data/derive';
 import { formatCurrency, formatMultiplier, formatPercent, formatNumber } from '../utils/formatters';
 import { format } from 'date-fns';
 
@@ -22,7 +23,8 @@ function exportToCSV(data: Record<string, any>[], filename: string) {
 }
 
 export function Reports({ selectedDays }: ReportsProps) {
-  const kpis = getAccountKPIs(selectedDays);
+  const { campaigns, adSets, ads, timeSeries } = useData();
+  const kpis = computeAccountKPIs(timeSeries, selectedDays);
   const today = format(new Date(2026, 5, 29), 'MMMM d, yyyy');
 
   const exportCampaigns = () => {

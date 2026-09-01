@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Play, Image, LayoutGrid, Zap, TrendingUp, TrendingDown, Search, Grid, List } from 'lucide-react';
 import { clsx } from 'clsx';
-import { ads } from '../data/mockData';
+import { useData } from '../context/DataContext';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier } from '../utils/formatters';
 import { StatusBadge, Badge } from '../components/ui/Badge';
 import { getRankingColor, getRankingLabel } from '../utils/formatters';
@@ -166,6 +166,7 @@ function AdCard({ ad }: { ad: Ad }) {
 }
 
 export function Ads() {
+  const { ads } = useData();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'roas' | 'spend' | 'cpa' | 'purchases'>('roas');

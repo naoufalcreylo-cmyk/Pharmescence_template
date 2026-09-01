@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, Sun, Moon, RefreshCw, Printer, Calendar, ChevronDown, Search, Megaphone, Users, Image } from 'lucide-react';
 import { clsx } from 'clsx';
 import { format, subDays } from 'date-fns';
-import { campaigns, adSets, ads } from '../../data/mockData';
+
 import { useFilters } from '../../context/FiltersContext';
+import { useData } from '../../context/DataContext';
 import { printView } from '../../utils/export';
-import type { NavPage } from '../../types';
+import type { NavPage, Campaign, AdSet, Ad } from '../../types';
 
 const pageTitles: Record<NavPage, string> = {
   overview: 'Executive Overview',
@@ -60,17 +61,56 @@ interface SearchHit {
   icon: React.ElementType;
 }
 
-/** Flat index over every entity — the quick-jump search runs against this. */
-const SEARCH_INDEX: SearchHit[] = [
-  ...campaigns.map(c => ({ id: c.id, name: c.name, context: c.objective.replace(/_/g, ' '), kind: 'campaigns' as const, page: 'campaigns' as NavPage, icon: Megaphone })),
-  ...adSets.map(a => ({ id: a.id, name: a.name, context: a.campaignName, kind: 'adSets' as const, page: 'adsets' as NavPage, icon: Users })),
-  ...ads.map(a => ({ id: a.id, name: a.name, context: a.adSetName, kind: 'ads' as const, page: 'ads' as NavPage, icon: Image })),
-];
+/** Flat index over every entity, built from whichever dataset is active. */
+function buildSearchIndex(source: { campaigns: Campaign[]; adSets: AdSet[]; ads: Ad[] }): SearchHit[] {
+  return [
+    ...source.campaigns.map(c => ({ id: c.id, name: c.name, context: c.objective.replace(/_/g, ' '), kind: 'campaigns' as const, page: 'campaigns' as NavPage, icon: Megaphone })),
+    ...source.adSets.map(a => ({ id: a.id, name: a.name, context: a.campaignName, kind: 'adSets' as const, page: 'adsets' as NavPage, icon: Users })),
+    ...source.ads.map(a => ({ id: a.id, name: a.name, context: a.adSetName, kind: 'ads' as const, page: 'ads' as NavPage, icon: Image })),
+  ];
+}
+
+/**
+ * Says whether the numbers on screen came from Meta or from the bundled sample.
+ *
+ * Sitting in the header rather than on one page because the risk it guards
+ * against is someone reading a chart on any page and assuming it is real.
+ */
+function DataSourceBadge({ onOpenConnection }: { onOpenConnection: () => void }) {
+  const { source, loading } = useData();
+
+  if (loading) {
+    return (
+      <span className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-500/10 text-slate-400 border border-slate-500/20">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse-soft" />
+        Loading
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={onOpenConnection}
+      title={source === 'live' ? 'Live Meta data — click for details' : 'Sample data — click to connect your ad account'}
+      className={clsx(
+        'hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors',
+        source === 'live'
+          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+          : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20',
+      )}
+    >
+      <span className={clsx('w-1.5 h-1.5 rounded-full', source === 'live' ? 'bg-emerald-400' : 'bg-amber-400')} />
+      {source === 'live' ? 'Live data' : 'Sample data'}
+    </button>
+  );
+}
 
 export function Header({
   activePage, onToggleSidebar, onNavigate, darkMode, onToggleDark, onRefresh, isRefreshing, offsetLeft,
 }: HeaderProps) {
   const { filters, setDays, setValues } = useFilters();
+  const { campaigns, adSets, ads } = useData();
+  const searchIndex = useMemo(() => buildSearchIndex({ campaigns, adSets, ads }), [campaigns, adSets, ads]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -111,10 +151,10 @@ export function Header({
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return SEARCH_INDEX
+    return searchIndex
       .filter(h => h.name.toLowerCase().includes(q) || h.context.toLowerCase().includes(q))
       .slice(0, 8);
-  }, [query]);
+  }, [query, searchIndex]);
 
   /** Jump to an entity by pinning it in the global filters, then navigating. */
   const jumpTo = (hit: SearchHit) => {
@@ -141,6 +181,7 @@ export function Header({
         <h1 className="text-sm font-semibold text-white truncate">{pageTitles[activePage]}</h1>
         <span className="text-slate-600 hidden sm:block">·</span>
         <span className="text-xs text-slate-500 hidden sm:block">Pharmescence</span>
+        <DataSourceBadge onOpenConnection={() => onNavigate('connection')} />
       </div>
 
       <div className="flex-1" />
@@ -174,7 +215,7 @@ export function Header({
             <div className="max-h-80 overflow-y-auto py-1">
               {query.trim() === '' ? (
                 <p className="px-3 py-6 text-xs text-slate-500 text-center">
-                  Type to search {SEARCH_INDEX.length} entities. Selecting one pins it in the global filters.
+                  Type to search {searchIndex.length} entities. Selecting one pins it in the global filters.
                 </p>
               ) : hits.length === 0 ? (
                 <p className="px-3 py-6 text-xs text-slate-500 text-center">No matches for “{query}”</p>

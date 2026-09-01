@@ -46,11 +46,27 @@ const INSIGHT_FIELDS = [
   'date_stop',
 ].join(',');
 
+/**
+ * Ad-level extras. Delivery rankings and video engagement only exist at ad
+ * level, and Meta returns "UNKNOWN" for rankings until an ad has enough
+ * impressions to be scored — that is expected, not an error.
+ */
+const AD_EXTRA_FIELDS = [
+  'quality_ranking',
+  'engagement_rate_ranking',
+  'conversion_rate_ranking',
+  'video_play_actions',
+  'video_thruplay_watched_actions',
+  'video_avg_time_watched_actions',
+  'outbound_clicks',
+  'outbound_clicks_ctr',
+].join(',');
+
 const LEVEL_FIELDS: Record<string, string> = {
   account: INSIGHT_FIELDS,
   campaign: `${INSIGHT_FIELDS},campaign_id,campaign_name`,
   adset: `${INSIGHT_FIELDS},campaign_id,campaign_name,adset_id,adset_name`,
-  ad: `${INSIGHT_FIELDS},campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name`,
+  ad: `${INSIGHT_FIELDS},campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,${AD_EXTRA_FIELDS}`,
 };
 
 /** Breakdown combinations Meta actually allows together. */
@@ -150,7 +166,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const resource = one(q.resource) ?? 'ping';
   const days = Math.min(Math.max(parseInt(one(q.days) ?? '30', 10) || 30, 1), 365);
 
-  const timeRange = JSON.stringify({ since: isoDaysAgo(days - 1), until: todayIso() });
+  // `prev=1` asks for the window immediately before the current one, which is
+  // what every "vs previous period" delta on the dashboard compares against.
+  const wantPrevious = one(q.prev) === '1';
+  const timeRange = wantPrevious
+    ? JSON.stringify({ since: isoDaysAgo(days * 2 - 1), until: isoDaysAgo(days) })
+    : JSON.stringify({ since: isoDaysAgo(days - 1), until: todayIso() });
 
   try {
     let url: string;

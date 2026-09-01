@@ -8,7 +8,8 @@ import { format, parseISO } from 'date-fns';
 import { clsx } from 'clsx';
 import { KPICard } from '../components/kpi/KPICard';
 import { AccountScoreWidget } from '../components/kpi/AccountScore';
-import { timeSeriesData, getAccountKPIs } from '../data/mockData';
+import { useData } from '../context/DataContext';
+import { computeAccountKPIs } from '../data/derive';
 import { computeAccountScore } from '../data/engineData';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier, formatValue } from '../utils/formatters';
 import type { KPIMetric } from '../types';
@@ -44,8 +45,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function Overview({ selectedDays }: OverviewProps) {
-  const kpis = getAccountKPIs(selectedDays);
-  const recent = timeSeriesData.slice(-selectedDays);
+  const { timeSeries } = useData();
+  const kpis = computeAccountKPIs(timeSeries, selectedDays);
+  const recent = timeSeries.slice(-selectedDays);
   const accountScore = computeAccountScore(selectedDays);
 
   const sparkline = (key: keyof typeof recent[0]) =>

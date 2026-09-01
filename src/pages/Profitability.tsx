@@ -2,7 +2,7 @@ import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Cartesia
 import { format, parseISO } from 'date-fns';
 import { DollarSign, TrendingUp, TrendingDown, Target, ShoppingBag } from 'lucide-react';
 import { clsx } from 'clsx';
-import { timeSeriesData } from '../data/mockData';
+import { useData } from '../context/DataContext';
 import { formatCurrency, formatPercent, formatMultiplier, formatNumber } from '../utils/formatters';
 
 interface ProfitabilityProps {
@@ -10,7 +10,8 @@ interface ProfitabilityProps {
 }
 
 export function Profitability({ selectedDays }: ProfitabilityProps) {
-  const recent = timeSeriesData.slice(-selectedDays);
+  const { timeSeries } = useData();
+  const recent = timeSeries.slice(-selectedDays);
 
   const totalSpend = recent.reduce((s, d) => s + d.spend, 0);
   const totalRevenue = recent.reduce((s, d) => s + d.revenue, 0);

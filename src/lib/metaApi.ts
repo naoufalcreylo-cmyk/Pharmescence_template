@@ -42,6 +42,14 @@ export interface MetaInsightRow {
   adset_name?: string;
   ad_id?: string;
   ad_name?: string;
+  quality_ranking?: string;
+  engagement_rate_ranking?: string;
+  conversion_rate_ranking?: string;
+  video_play_actions?: MetaAction[];
+  video_thruplay_watched_actions?: MetaAction[];
+  video_avg_time_watched_actions?: MetaAction[];
+  outbound_clicks?: MetaAction[];
+  outbound_clicks_ctr?: MetaAction[];
   [breakdown: string]: unknown;
 }
 
@@ -156,6 +164,15 @@ export interface NormalizedRow {
   adSetName?: string;
   adId?: string;
   adName?: string;
+  // Ad-level only
+  qualityRanking?: string;
+  engagementRanking?: string;
+  conversionRanking?: string;
+  videoPlays?: number;
+  videoWatchTime?: number;
+  thruPlays?: number;
+  outboundClicks?: number;
+  outboundCtr?: number;
 }
 
 /**
@@ -201,7 +218,22 @@ export function normalizeRow(r: MetaInsightRow): NormalizedRow {
     adSetName: r.adset_name,
     adId: r.ad_id,
     adName: r.ad_name,
+    // Ad-level extras. These arrive as single-entry action arrays rather than
+    // plain fields, so the same `actions` unwrapping applies.
+    qualityRanking: r.quality_ranking,
+    engagementRanking: r.engagement_rate_ranking,
+    conversionRanking: r.conversion_rate_ranking,
+    videoPlays: firstActionValue(r.video_play_actions),
+    thruPlays: firstActionValue(r.video_thruplay_watched_actions),
+    videoWatchTime: firstActionValue(r.video_avg_time_watched_actions),
+    outboundClicks: firstActionValue(r.outbound_clicks),
+    outboundCtr: firstActionValue(r.outbound_clicks_ctr),
   };
+}
+
+/** Several ad metrics come back as a one-element array rather than a scalar. */
+function firstActionValue(actions: MetaAction[] | undefined): number {
+  return actions?.length ? num(actions[0].value) : 0;
 }
 
 // --- Transport ---------------------------------------------------------------
@@ -288,11 +320,12 @@ export async function checkConnection(): Promise<ConnectionState> {
 
 export async function fetchInsights(
   level: 'account' | 'campaign' | 'adset' | 'ad',
-  opts: { days?: number; daily?: boolean; breakdowns?: string } = {},
+  opts: { days?: number; daily?: boolean; breakdowns?: string; previous?: boolean } = {},
 ): Promise<NormalizedRow[]> {
   const params: Record<string, string> = { resource: 'insights', level, days: String(opts.days ?? 30) };
   if (opts.daily) params.daily = '1';
   if (opts.breakdowns) params.breakdowns = opts.breakdowns;
+  if (opts.previous) params.prev = '1';
 
   const body = await call<MetaInsightRow[]>(params);
   return (body.data ?? []).map(normalizeRow);

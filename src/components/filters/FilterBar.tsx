@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import { ChevronDown, Filter, X, Check, Search } from 'lucide-react';
 import { useFilters } from '../../context/FiltersContext';
-import { FILTER_DEFS } from '../../lib/selectors';
+
 import type { FilterDef, FilterOption } from '../../lib/selectors';
 import type { FilterKey } from '../../types';
 
@@ -133,14 +133,14 @@ function FilterDropdown({ def }: { def: FilterDef }) {
  * made here narrows every table, chart and recommendation in the dashboard.
  */
 export function FilterBar() {
-  const { activeCount, clear, data, filters } = useFilters();
+  const { activeCount, clear, data, filters, filterDefs } = useFilters();
   const [expanded, setExpanded] = useState(false);
 
   // Keep the common four visible; the rest live behind "More filters" so the
   // bar does not dominate the viewport on smaller screens.
   const primary: FilterKey[] = ['campaigns', 'adSets', 'ads', 'statuses'];
-  const primaryDefs = FILTER_DEFS.filter(d => primary.includes(d.key));
-  const secondaryDefs = FILTER_DEFS.filter(d => !primary.includes(d.key));
+  const primaryDefs = filterDefs.filter(d => primary.includes(d.key));
+  const secondaryDefs = filterDefs.filter(d => !primary.includes(d.key));
 
   return (
     <div className="card px-4 py-3 flex flex-wrap items-center gap-2 print:hidden">

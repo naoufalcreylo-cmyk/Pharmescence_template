@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search, Filter } from 'lucide-react';
 import { clsx } from 'clsx';
-import { campaigns } from '../data/mockData';
+import { useData } from '../context/DataContext';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier, formatDelta, getTrendColor } from '../utils/formatters';
 import { StatusBadge } from '../components/ui/Badge';
 import type { Campaign } from '../types';
@@ -68,6 +68,7 @@ function ROASBar({ value }: { value: number }) {
 }
 
 export function Campaigns() {
+  const { campaigns } = useData();
   const [sortKey, setSortKey] = useState<SortKey>('spend');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');

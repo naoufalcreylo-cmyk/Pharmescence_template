@@ -4,6 +4,7 @@ import { Header } from './components/layout/Header';
 import { FilterBar } from './components/filters/FilterBar';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { FiltersProvider, useFilters } from './context/FiltersContext';
+import { DataProvider, useData } from './context/DataContext';
 import { PageSkeleton } from './components/ui/Skeleton';
 
 import { Overview } from './pages/Overview';
@@ -134,9 +135,15 @@ function Dashboard() {
 }
 
 export default function App() {
+  // Owned here because DataProvider and FiltersProvider both need it, and
+  // DataProvider sits above the filter store.
+  const [days, setDays] = useState(30);
+
   return (
-    <FiltersProvider>
-      <Dashboard />
-    </FiltersProvider>
+    <DataProvider days={days}>
+      <FiltersProvider days={days} onDaysChange={setDays}>
+        <Dashboard />
+      </FiltersProvider>
+    </DataProvider>
   );
 }

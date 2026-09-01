@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, Users } from 'lucide-react';
 import { clsx } from 'clsx';
-import { adSets } from '../data/mockData';
+import { useData } from '../context/DataContext';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier } from '../utils/formatters';
 import { StatusBadge } from '../components/ui/Badge';
 import type { AdSet } from '../types';
@@ -22,6 +22,7 @@ function GenderBadge({ gender }: { gender: string }) {
 }
 
 export function AdSets() {
+  const { adSets } = useData();
   const [sortKey, setSortKey] = useState<SortKey>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [search, setSearch] = useState('');
