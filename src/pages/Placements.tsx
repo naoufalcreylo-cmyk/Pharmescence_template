@@ -6,6 +6,7 @@ import {
 import { clsx } from 'clsx';
 import { LayoutGrid, Facebook, Instagram, MessageCircle, Network } from 'lucide-react';
 import { placementBreakdown, publisherPlatformBreakdown } from '../data/breakdownData';
+import { useLiveBreakdown } from '../hooks/useLiveBreakdown';
 import { BreakdownTable } from '../components/tables/BreakdownTable';
 import { TARGET_ROAS } from '../data/performanceData';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier } from '../utils/formatters';
@@ -45,12 +46,17 @@ export function Placements() {
   const { filters } = useFilters();
   const [metric, setMetric] = useState<CompareMetric>('roas');
 
+  const { data: live, loading, isLive } = useLiveBreakdown(['placement']);
+  // Live rows when connected, bundled sample otherwise — same shape either way.
+  const allPlacements = isLive ? live.placement : placementBreakdown;
+  const allPlatforms = isLive ? live.platform : publisherPlatformBreakdown;
+
   const rows: BreakdownRow[] = useMemo(
     () =>
       filters.placements.length > 0
-        ? placementBreakdown.filter(p => filters.placements.includes(p.segment))
-        : placementBreakdown,
-    [filters.placements],
+        ? allPlacements.filter(p => filters.placements.includes(p.segment))
+        : allPlacements,
+    [filters.placements, allPlacements],
   );
 
   const totals = useMemo(() => summarize(rows), [rows]);
@@ -76,14 +82,14 @@ export function Placements() {
   // Share-of-spend ring per publisher platform.
   const platformRings = useMemo(
     () =>
-      publisherPlatformBreakdown.map((p, i) => ({
+      allPlatforms.map((p, i) => ({
         name: p.segment,
-        value: totals.spend > 0 ? (p.spend / publisherPlatformBreakdown.reduce((s, x) => s + x.spend, 0)) * 100 : 0,
+        value: totals.spend > 0 ? (p.spend / allPlatforms.reduce((s, x) => s + x.spend, 0)) * 100 : 0,
         roas: p.roas,
         spend: p.spend,
         fill: ['#7C3AED', '#06B6D4', '#10B981', '#F59E0B'][i % 4],
       })),
-    [totals.spend],
+    [totals.spend, allPlatforms],
   );
 
   if (rows.length === 0) {
@@ -223,7 +229,7 @@ export function Placements() {
             </RadialBarChart>
           </ResponsiveContainer>
           <div className="space-y-2 mt-2">
-            {publisherPlatformBreakdown.map((p, i) => {
+            {allPlatforms.map((p, i) => {
               const Icon = PLATFORM_ICON[p.segment] ?? Network;
               return (
                 <div key={p.segment} className="flex items-center gap-2.5">

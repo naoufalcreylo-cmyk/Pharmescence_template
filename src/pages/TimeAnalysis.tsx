@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import { Clock, CalendarDays, CalendarRange, Sunrise } from 'lucide-react';
 import { heatmapData } from '../data/mockData';
+import { useLiveBreakdown } from '../hooks/useLiveBreakdown';
 import { hourBreakdown, weekdayBreakdown, monthBreakdown, WEEKDAY_LABELS } from '../data/breakdownData';
 import { BreakdownTable } from '../components/tables/BreakdownTable';
 import { TARGET_ROAS } from '../data/performanceData';
@@ -33,22 +34,37 @@ const LEVELS: { id: TimeLevel; label: string; icon: React.ElementType; rows: Bre
   { id: 'month', label: 'Month', icon: CalendarRange, rows: monthBreakdown, metaLabel: 'Delivery' },
 ];
 
-const HOURS = [...new Set(heatmapData.map(c => c.hour))].sort((a, b) => a - b);
+
 
 export function TimeAnalysis() {
   const { filters } = useFilters();
+  const { data: live, loading, isLive } = useLiveBreakdown(['time']);
   const [heatMetric, setHeatMetric] = useState<HeatMetric>('purchases');
   const [level, setLevel] = useState<TimeLevel>('hour');
 
   // Each heatmap cell carries purchases and ROAS; CPA is derived from the two so
   // the third view stays consistent with the first two rather than inventing data.
+  const sourceCells = isLive ? live.heatmap : heatmapData;
+  const hourRows = isLive ? live.hour : hourBreakdown;
+  const weekdayRows = isLive ? live.weekday : weekdayBreakdown;
+  const monthRows = isLive ? live.month : monthBreakdown;
+
   const cells = useMemo(
     () =>
-      heatmapData.map(c => ({
+      sourceCells.map(c => ({
         ...c,
-        cpa: c.purchases > 0 ? (c.purchases * 68) / c.roas / c.purchases : 0,
+        // Real spend when the cell carries it; the sample grid has none, so fall
+        // back to reconstructing spend from its ROAS and a nominal order value.
+        cpa: c.purchases > 0
+          ? (c.spend ?? (c.roas > 0 ? (c.purchases * 68) / c.roas : 0)) / c.purchases
+          : 0,
       })),
-    [],
+    [sourceCells],
+  );
+
+  const HOURS = useMemo(
+    () => [...new Set(sourceCells.map(c => c.hour))].sort((a, b) => a - b),
+    [sourceCells],
   );
 
   const valueOf = (c: (typeof cells)[number]) =>
@@ -82,10 +98,14 @@ export function TimeAnalysis() {
     return [...(eligible.length ? eligible : rows)].sort((a, b) => b.roas - a.roas)[0];
   };
 
-  const bestHour = useMemo(() => bestBy(hourBreakdown), []);
-  const bestDay = useMemo(() => bestBy(weekdayBreakdown), []);
-  const bestMonth = useMemo(() => bestBy(monthBreakdown), []);
-  const activeLevel = LEVELS.find(l => l.id === level)!;
+  const bestHour = useMemo(() => bestBy(hourRows), [hourRows]);
+  const bestDay = useMemo(() => bestBy(weekdayRows), [weekdayRows]);
+  const bestMonth = useMemo(() => bestBy(monthRows), [monthRows]);
+  const levels = LEVELS.map(l => ({
+    ...l,
+    rows: l.id === 'hour' ? hourRows : l.id === 'weekday' ? weekdayRows : monthRows,
+  }));
+  const activeLevel = levels.find(l => l.id === level)!;
 
   const fmtHeat = (v: number) =>
     heatMetric === 'purchases' ? formatNumber(v) : heatMetric === 'roas' ? formatMultiplier(v) : formatCurrency(v);
@@ -190,7 +210,7 @@ export function TimeAnalysis() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 className="text-sm font-semibold text-white">Performance by {activeLevel.label}</h3>
           <div className="inline-flex rounded-xl bg-bg-elevated border border-bg-border p-0.5">
-            {LEVELS.map(l => {
+            {levels.map(l => {
               const Icon = l.icon;
               return (
                 <button

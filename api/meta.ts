@@ -166,12 +166,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const resource = one(q.resource) ?? 'ping';
   const days = Math.min(Math.max(parseInt(one(q.days) ?? '30', 10) || 30, 1), 365);
 
-  // `prev=1` asks for the window immediately before the current one, which is
-  // what every "vs previous period" delta on the dashboard compares against.
-  const wantPrevious = one(q.prev) === '1';
-  const timeRange = wantPrevious
-    ? JSON.stringify({ since: isoDaysAgo(days * 2 - 1), until: isoDaysAgo(days) })
-    : JSON.stringify({ since: isoDaysAgo(days - 1), until: todayIso() });
+  /**
+   * Explicit `since`/`until` win over `days`, because the client's presets are
+   * calendar-aware (Today, Yesterday, This month, Custom) and cannot all be
+   * expressed as "N days back from now". `days` remains as a fallback.
+   */
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+  const since = one(q.since);
+  const until = one(q.until);
+
+  let timeRange: string;
+  if (since && until && isoDate.test(since) && isoDate.test(until)) {
+    timeRange = JSON.stringify({ since, until });
+  } else {
+    // `prev=1` asks for the window immediately before the current one, which is
+    // what every "vs previous period" delta on the dashboard compares against.
+    const wantPrevious = one(q.prev) === '1';
+    timeRange = wantPrevious
+      ? JSON.stringify({ since: isoDaysAgo(days * 2 - 1), until: isoDaysAgo(days) })
+      : JSON.stringify({ since: isoDaysAgo(days - 1), until: todayIso() });
+  }
 
   try {
     let url: string;

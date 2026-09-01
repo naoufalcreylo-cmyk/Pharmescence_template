@@ -4,6 +4,7 @@ import type { GlobalFilters, FilterKey } from '../types';
 import { DEFAULT_FILTERS, applyFilters, activeFilterCount, buildFilterDefs } from '../lib/selectors';
 import type { FilteredData, FilterDef } from '../lib/selectors';
 import { useData } from './DataContext';
+import type { DateRange } from '../lib/dateRanges';
 
 interface FiltersContextValue {
   filters: GlobalFilters;
@@ -11,7 +12,8 @@ interface FiltersContextValue {
   /** Filter options, derived from whichever dataset is currently active. */
   filterDefs: FilterDef[];
   activeCount: number;
-  setDays: (days: number) => void;
+  range: DateRange;
+  setRange: (range: DateRange) => void;
   toggle: (key: FilterKey, value: string) => void;
   setValues: (key: FilterKey, values: string[]) => void;
   clear: (key?: FilterKey) => void;
@@ -25,17 +27,18 @@ const FiltersContext = createContext<FiltersContextValue | null>(null);
  * request from Meta.
  */
 export function FiltersProvider({
-  children, days, onDaysChange,
+  children, range, onRangeChange,
 }: {
   children: ReactNode;
-  days: number;
-  onDaysChange: (days: number) => void;
+  range: DateRange;
+  onRangeChange: (range: DateRange) => void;
 }) {
+  const days = range.days;
   const [selection, setSelection] = useState<GlobalFilters>(DEFAULT_FILTERS);
   const filters = useMemo<GlobalFilters>(() => ({ ...selection, days }), [selection, days]);
   const setFilters = setSelection;
 
-  const setDays = onDaysChange;
+  const setRange = onRangeChange;
 
   const toggle = useCallback((key: FilterKey, value: string) => {
     setFilters(f => {
@@ -67,8 +70,8 @@ export function FiltersProvider({
   const activeCount = useMemo(() => activeFilterCount(filters), [filters]);
 
   const value = useMemo(
-    () => ({ filters, data, filterDefs, activeCount, setDays, toggle, setValues, clear }),
-    [filters, data, filterDefs, activeCount, setDays, toggle, setValues, clear],
+    () => ({ filters, data, filterDefs, activeCount, range, setRange, toggle, setValues, clear }),
+    [filters, data, filterDefs, activeCount, range, setRange, toggle, setValues, clear],
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;

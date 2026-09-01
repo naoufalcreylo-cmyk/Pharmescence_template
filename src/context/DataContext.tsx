@@ -9,6 +9,8 @@ import {
 } from '../data/mockData';
 import { fetchEntities, fetchInsights, MetaApiError } from '../lib/metaApi';
 import { mapCampaigns, mapAdSets, mapAds, mapTimeSeries } from '../data/liveMappers';
+import { previousRange } from '../lib/dateRanges';
+import type { DateRange } from '../lib/dateRanges';
 
 /**
  * The dashboard's single source of entity data.
@@ -36,8 +38,9 @@ interface DataContextValue {
   /** Why live data was unavailable, when it was attempted and failed. */
   error: string | null;
   refresh: () => void;
-  days: number;
-  setDays: (d: number) => void;
+  range: DateRange;
+  /** Bumped on every refresh, so lazy loaders can invalidate their caches. */
+  nonce: number;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -49,14 +52,14 @@ const SAMPLE = {
   timeSeries: mockTimeSeries,
 };
 
-export function DataProvider({ children, days }: { children: ReactNode; days: number }) {
+export function DataProvider({ children, range }: { children: ReactNode; range: DateRange }) {
   const [state, setState] = useState({ ...SAMPLE, source: 'sample' as DataSource });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
-  const [activeDays, setActiveDays] = useState(days);
 
-  useEffect(() => { setActiveDays(days); }, [days]);
+  const { since, until } = range;
+  const prev = useMemo(() => previousRange(range), [range]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,27 +69,29 @@ export function DataProvider({ children, days }: { children: ReactNode; days: nu
       setError(null);
 
       try {
-        // Eight calls, issued together rather than in sequence: the entity edges
-        // and the insight edges are independent, and Meta's per-account rate
-        // limit counts calls, not concurrency.
+        // Issued together rather than in sequence: the entity edges and the
+        // insight edges are independent, and each reaches Meta through its own
+        // serverless invocation, so concurrency costs nothing extra.
         const [
           campaignEntities, adSetEntities, adEntities,
           campaignInsights, adSetInsights, adInsights,
-          daily,
+          daily, dailyPrev,
           campaignPrev, adSetPrev, adPrev,
         ] = await Promise.all([
           fetchEntities('campaigns'),
           fetchEntities('adsets'),
           fetchEntities('ads'),
-          fetchInsights('campaign', { days: activeDays }),
-          fetchInsights('adset', { days: activeDays }),
-          fetchInsights('ad', { days: activeDays }),
-          // Twice the window: the KPI cards compare the latest N days against the N
-          // before them, and that comparison is a slice of this one series.
-          fetchInsights('account', { days: activeDays * 2, daily: true }),
-          fetchInsights('campaign', { days: activeDays, previous: true }),
-          fetchInsights('adset', { days: activeDays, previous: true }),
-          fetchInsights('ad', { days: activeDays, previous: true }),
+          fetchInsights('campaign', { since, until }),
+          fetchInsights('adset', { since, until }),
+          fetchInsights('ad', { since, until }),
+          fetchInsights('account', { since, until, daily: true }),
+          // The previous window is fetched as its own daily series rather than
+          // by over-fetching one long series: calendar presets like "This month"
+          // have a previous period that is not simply N more days back.
+          fetchInsights('account', { since: prev.since, until: prev.until, daily: true }),
+          fetchInsights('campaign', { since: prev.since, until: prev.until }),
+          fetchInsights('adset', { since: prev.since, until: prev.until }),
+          fetchInsights('ad', { since: prev.since, until: prev.until }),
         ]);
 
         if (cancelled) return;
@@ -97,11 +102,11 @@ export function DataProvider({ children, days }: { children: ReactNode; days: nu
         const liveCampaigns = mapCampaigns(campaignEntities, campaignInsights, campaignPrev);
         const liveAdSets = mapAdSets(adSetEntities, adSetInsights, adSetPrev, campaignNames);
         const liveAds = mapAds(adEntities, adInsights, adPrev, adSetNames, campaignNames);
-        const liveSeries = mapTimeSeries(daily);
 
-        // An account that returns nothing at all is almost always a date range
-        // with no delivery rather than a working dashboard. Showing empty tables
-        // is still the honest outcome, so only the totally-empty case falls back.
+        // Previous days first, then current: the KPI helpers read the comparison
+        // period as `slice(-days*2, -days)` of one continuous series.
+        const liveSeries = [...mapTimeSeries(dailyPrev), ...mapTimeSeries(daily)];
+
         if (liveCampaigns.length === 0 && liveSeries.length === 0) {
           setState({ ...SAMPLE, source: 'sample' });
           setError('Meta returned no campaigns or delivery for this period. Showing sample data.');
@@ -128,13 +133,13 @@ export function DataProvider({ children, days }: { children: ReactNode; days: nu
 
     void load();
     return () => { cancelled = true; };
-  }, [activeDays, nonce]);
+  }, [since, until, prev.since, prev.until, nonce]);
 
   const refresh = useCallback(() => setNonce(n => n + 1), []);
 
   const value = useMemo<DataContextValue>(
-    () => ({ ...state, loading, error, refresh, days: activeDays, setDays: setActiveDays }),
-    [state, loading, error, refresh, activeDays],
+    () => ({ ...state, loading, error, refresh, range, nonce }),
+    [state, loading, error, refresh, range, nonce],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

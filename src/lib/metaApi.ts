@@ -318,27 +318,51 @@ export async function checkConnection(): Promise<ConnectionState> {
   }
 }
 
-export async function fetchInsights(
-  level: 'account' | 'campaign' | 'adset' | 'ad',
-  opts: { days?: number; daily?: boolean; breakdowns?: string; previous?: boolean } = {},
-): Promise<NormalizedRow[]> {
-  const params: Record<string, string> = { resource: 'insights', level, days: String(opts.days ?? 30) };
+export interface InsightQuery {
+  /** Explicit window. Preferred — presets like Today are not "N days back". */
+  since?: string;
+  until?: string;
+  days?: number;
+  daily?: boolean;
+  breakdowns?: string;
+  previous?: boolean;
+}
+
+function queryParams(level: string, opts: InsightQuery): Record<string, string> {
+  const params: Record<string, string> = { resource: 'insights', level };
+  if (opts.since && opts.until) {
+    params.since = opts.since;
+    params.until = opts.until;
+  } else {
+    params.days = String(opts.days ?? 30);
+    if (opts.previous) params.prev = '1';
+  }
   if (opts.daily) params.daily = '1';
   if (opts.breakdowns) params.breakdowns = opts.breakdowns;
-  if (opts.previous) params.prev = '1';
+  return params;
+}
 
-  const body = await call<MetaInsightRow[]>(params);
+export async function fetchInsights(
+  level: 'account' | 'campaign' | 'adset' | 'ad',
+  opts: InsightQuery = {},
+): Promise<NormalizedRow[]> {
+  const body = await call<MetaInsightRow[]>(queryParams(level, opts));
   return (body.data ?? []).map(normalizeRow);
 }
 
-/** Raw insight rows, for breakdowns where the segment key must be read directly. */
+/**
+ * Raw insight rows, keeping the breakdown keys.
+ *
+ * A breakdown response carries its segment as an extra top-level property named
+ * after the breakdown (`age`, `country`, `publisher_platform`...), which
+ * `normalizeRow` drops. Breakdown callers need both, so they get the raw row
+ * and normalize it themselves.
+ */
 export async function fetchInsightsRaw(
   level: 'account' | 'campaign' | 'adset' | 'ad',
-  opts: { days?: number; breakdowns?: string } = {},
+  opts: InsightQuery = {},
 ): Promise<MetaInsightRow[]> {
-  const params: Record<string, string> = { resource: 'insights', level, days: String(opts.days ?? 30) };
-  if (opts.breakdowns) params.breakdowns = opts.breakdowns;
-  const body = await call<MetaInsightRow[]>(params);
+  const body = await call<MetaInsightRow[]>(queryParams(level, opts));
   return body.data ?? [];
 }
 

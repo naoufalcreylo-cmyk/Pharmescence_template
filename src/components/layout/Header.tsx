@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Menu, Sun, Moon, RefreshCw, Printer, Calendar, ChevronDown, Search, Megaphone, Users, Image } from 'lucide-react';
+import { Menu, Sun, Moon, RefreshCw, Printer, Search, Megaphone, Users, Image } from 'lucide-react';
 import { clsx } from 'clsx';
-import { format, subDays } from 'date-fns';
 
 import { useFilters } from '../../context/FiltersContext';
 import { useData } from '../../context/DataContext';
 import { printView } from '../../utils/export';
+import { DateRangePicker } from './DateRangePicker';
 import type { NavPage, Campaign, AdSet, Ad } from '../../types';
 
 const pageTitles: Record<NavPage, string> = {
@@ -31,14 +31,6 @@ const pageTitles: Record<NavPage, string> = {
   reports: 'Reports & Export',
   connection: 'Live Data Connection',
 };
-
-const DATE_PRESETS = [
-  { label: 'Last 7 Days', days: 7 },
-  { label: 'Last 14 Days', days: 14 },
-  { label: 'Last 30 Days', days: 30 },
-  { label: 'Last 60 Days', days: 60 },
-  { label: 'Last 90 Days', days: 90 },
-];
 
 interface HeaderProps {
   activePage: NavPage;
@@ -108,19 +100,14 @@ function DataSourceBadge({ onOpenConnection }: { onOpenConnection: () => void })
 export function Header({
   activePage, onToggleSidebar, onNavigate, darkMode, onToggleDark, onRefresh, isRefreshing, offsetLeft,
 }: HeaderProps) {
-  const { filters, setDays, setValues } = useFilters();
+  const { setValues, range, setRange } = useFilters();
   const { campaigns, adSets, ads } = useData();
   const searchIndex = useMemo(() => buildSearchIndex({ campaigns, adSets, ads }), [campaigns, adSets, ads]);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLDivElement>(null);
-  const dateRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const today = new Date(2026, 5, 29);
-  const startDate = subDays(today, filters.days - 1);
-  const selectedLabel = DATE_PRESETS.find(p => p.days === filters.days)?.label ?? `Last ${filters.days} Days`;
 
   // Cmd/Ctrl+K focuses quick-jump, Escape closes any open popover.
   useEffect(() => {
@@ -130,10 +117,7 @@ export function Header({
         setSearchOpen(true);
         setTimeout(() => inputRef.current?.focus(), 0);
       }
-      if (e.key === 'Escape') {
-        setSearchOpen(false);
-        setShowDatePicker(false);
-      }
+      if (e.key === 'Escape') setSearchOpen(false);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -142,7 +126,6 @@ export function Header({
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!searchRef.current?.contains(e.target as Node)) setSearchOpen(false);
-      if (!dateRef.current?.contains(e.target as Node)) setShowDatePicker(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -242,39 +225,7 @@ export function Header({
         )}
       </div>
 
-      {/* Date range */}
-      <div className="relative" ref={dateRef}>
-        <button
-          onClick={() => setShowDatePicker(v => !v)}
-          className="flex items-center gap-2 bg-bg-elevated border border-bg-border rounded-xl px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:border-brand-600/50 transition-colors"
-        >
-          <Calendar size={14} className="text-brand-400" />
-          <span className="hidden sm:block">{selectedLabel}</span>
-          <span className="hidden md:block text-slate-500">
-            {format(startDate, 'MMM d')} – {format(today, 'MMM d, yyyy')}
-          </span>
-          <ChevronDown size={12} className="text-slate-500" />
-        </button>
-
-        {showDatePicker && (
-          <div className="absolute right-0 top-full mt-2 bg-bg-elevated border border-bg-border rounded-2xl shadow-card p-2 w-48 z-50 animate-fade-in">
-            {DATE_PRESETS.map(preset => (
-              <button
-                key={preset.days}
-                onClick={() => { setDays(preset.days); setShowDatePicker(false); }}
-                className={clsx(
-                  'w-full text-left px-3 py-2 text-sm rounded-xl transition-colors',
-                  filters.days === preset.days
-                    ? 'bg-brand-600/20 text-brand-400 font-medium'
-                    : 'text-slate-400 hover:text-white hover:bg-bg-hover',
-                )}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <DateRangePicker value={range} onChange={setRange} />
 
       {/* Actions */}
       <div className="flex items-center gap-1.5">

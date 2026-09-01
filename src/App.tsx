@@ -30,6 +30,8 @@ import { Reports } from './pages/Reports';
 import { Connection } from './pages/Connection';
 
 import type { NavPage } from './types';
+import { DEFAULT_RANGE } from './lib/dateRanges';
+import type { DateRange } from './lib/dateRanges';
 
 /** Pages that show the global filter bar — breakdown-only views drive their own. */
 const FILTERED_PAGES: NavPage[] = [
@@ -137,11 +139,11 @@ function Dashboard() {
 export default function App() {
   // Owned here because DataProvider and FiltersProvider both need it, and
   // DataProvider sits above the filter store.
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
 
   return (
-    <DataProvider days={days}>
-      <FiltersProvider days={days} onDaysChange={setDays}>
+    <DataProvider range={range}>
+      <FiltersProvider range={range} onRangeChange={setRange}>
         <Dashboard />
       </FiltersProvider>
     </DataProvider>

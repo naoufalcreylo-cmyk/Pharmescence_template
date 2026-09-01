@@ -172,6 +172,8 @@ export interface HeatmapCell {
   value: number;
   purchases: number;
   roas: number;
+  /** Present on live cells; lets CPA be derived instead of assumed. */
+  spend?: number;
 }
 
 export interface Alert {

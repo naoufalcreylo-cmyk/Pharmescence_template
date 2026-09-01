@@ -6,6 +6,7 @@ import {
 import { clsx } from 'clsx';
 import { Layers, Sparkles } from 'lucide-react';
 import { DIMENSIONS, getDimension } from '../data/breakdownData';
+import { useLiveBreakdown } from '../hooks/useLiveBreakdown';
 import { BreakdownTable } from '../components/tables/BreakdownTable';
 import { EmptyState } from '../components/ui/EmptyState';
 import { formatCurrency, formatNumber, formatPercent, formatMultiplier } from '../utils/formatters';
@@ -40,16 +41,26 @@ export function Breakdowns() {
   const [dimension, setDimension] = useState<BreakdownDimension>('placement');
   const [metric, setMetric] = useState<ChartMetric>('spend');
 
+  const { data: live, loading, isLive } = useLiveBreakdown(['demographics', 'country', 'region', 'placement', 'device', 'time']);
   const def = getDimension(dimension);
+
+  // Live rows per dimension, falling back to the sample set for anything Meta
+  // does not expose (city has no insights breakdown).
+  const liveRows: Partial<Record<BreakdownDimension, BreakdownRow[]>> = {
+    age: live.age, gender: live.gender, placement: live.placement, platform: live.platform,
+    device: live.device, os: live.os, country: live.country, region: live.region,
+    hour: live.hour, weekday: live.weekday, month: live.month,
+  };
   const metricDef = CHART_METRICS.find(m => m.id === metric)!;
 
   // The Device filter is a breakdown-scoped filter (§18) — apply it here.
   const rows: BreakdownRow[] = useMemo(() => {
+    const source = (isLive ? liveRows[dimension] : undefined) ?? def.rows;
     if (dimension === 'device' && filters.devices.length > 0) {
-      return def.rows.filter(r => filters.devices.includes(r.segment));
+      return source.filter(r => filters.devices.includes(r.segment));
     }
-    return def.rows;
-  }, [def, dimension, filters.devices]);
+    return source;
+  }, [def, dimension, filters.devices, isLive, live]);
 
   const totals = useMemo(() => summarize(rows), [rows]);
 
@@ -91,7 +102,7 @@ export function Breakdowns() {
                     )}
                   >
                     {d.label}
-                    <span className="ml-1.5 opacity-50 tabular-nums">{d.rows.length}</span>
+                    <span className="ml-1.5 opacity-50 tabular-nums">{((isLive ? liveRows[d.id] : undefined) ?? d.rows).length}</span>
                   </button>
                 ))}
               </div>

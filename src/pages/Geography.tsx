@@ -5,6 +5,7 @@ import { WorldMap } from '../components/charts/WorldMap';
 import type { MapMetric } from '../components/charts/WorldMap';
 import { BreakdownTable } from '../components/tables/BreakdownTable';
 import { countryBreakdown, regionBreakdown, cityBreakdown } from '../data/breakdownData';
+import { useLiveBreakdown } from '../hooks/useLiveBreakdown';
 import { TARGET_ROAS } from '../data/performanceData';
 import { formatCurrency, formatNumber, formatMultiplier } from '../utils/formatters';
 import { summarize } from '../lib/selectors';
@@ -41,25 +42,32 @@ export function Geography() {
   const [selectedCode, setSelectedCode] = useState<string | undefined>();
 
   // The global Country filter narrows every level of this view.
+  const { data: live, loading, isLive } = useLiveBreakdown(['country', 'region']);
+  const allCountries = isLive ? live.country : countryBreakdown;
+  const allRegions = isLive ? live.region : regionBreakdown;
+  // Meta has no city breakdown on the insights edge, so the city level stays on
+  // sample data and is hidden entirely when the dashboard is live.
+  const allCities = isLive ? [] : cityBreakdown;
+
   const countries = useMemo(
     () =>
       filters.countries.length > 0
-        ? countryBreakdown.filter(c => filters.countries.includes(c.segment))
-        : countryBreakdown,
-    [filters.countries],
+        ? allCountries.filter(c => filters.countries.includes(c.segment))
+        : allCountries,
+    [filters.countries, allCountries],
   );
 
   const rows: BreakdownRow[] = useMemo(() => {
     if (level === 'country') return countries;
     const allowed = new Set(countries.map(c => c.segment));
     const codes = new Set(countries.map(c => c.countryCode));
-    if (level === 'region') return regionBreakdown.filter(r => !r.meta || allowed.has(r.meta));
+    if (level === 'region') return allRegions.filter(r => !r.meta || allowed.has(r.meta));
     // City meta reads "Region, CC" — match on the trailing country code.
-    return cityBreakdown.filter(c => {
+    return allCities.filter(c => {
       const cc = c.meta?.split(',').pop()?.trim();
       return !cc || codes.has(cc === 'UK' ? 'GB' : cc);
     });
-  }, [level, countries]);
+  }, [level, countries, allRegions, allCities]);
 
   const totals = useMemo(() => summarize(rows), [rows]);
   const activeLevel = LEVELS.find(l => l.id === level)!;
@@ -102,7 +110,7 @@ export function Geography() {
         </div>
 
         <WorldMap
-          points={countries}
+          points={countries.filter(c => c.lat !== 0 || c.lng !== 0)}
           metric={mapMetric}
           targetRoas={TARGET_ROAS}
           selectedCode={selectedCode}
