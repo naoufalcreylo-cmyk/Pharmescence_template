@@ -137,30 +137,79 @@ Built for accounts far larger than the sample data:
 
 ---
 
-## Connecting the live Meta Marketing API
+## Live Meta Marketing API data
 
-The data layer is isolated behind `src/data/`. Everything else consumes typed values
-from `src/types/`, so wiring the real account means replacing the module bodies, not
-the components.
+### How it is wired
 
-1. **Entities** — replace the exports in `mockData.ts` with calls to
-   `/act_<AD_ACCOUNT_ID>/campaigns`, `/adsets` and `/ads`, requesting `insights{...}`
-   inline to avoid one request per entity.
-2. **Metrics** — request these fields on the insights edge:
-   `spend, impressions, reach, frequency, clicks, inline_link_clicks, ctr,
-   inline_link_click_ctr, cpc, cpm, actions, action_values, purchase_roas`.
-   Purchase counts live in `actions` under `offsite_conversion.fb_pixel_purchase`;
-   revenue lives in the matching `action_values` entry.
+A static bundle has nowhere safe to keep an access token — anything the browser can
+read, a visitor can read. So live data goes through a serverless function:
+
+```
+Browser ──► /api/meta (Vercel function, holds the token) ──► graph.facebook.com
+```
+
+- **`api/meta.ts`** — the proxy. Runs on Vercel, never in the browser. Accepts a fixed
+  set of named resources rather than forwarding an arbitrary path, so a crafted request
+  cannot aim the token at an endpoint it was not meant for. Responses are edge-cached
+  for 5 minutes, because Meta rate limits per ad account rather than per visitor.
+- **`src/lib/metaApi.ts`** — the client. Absorbs the Insights API's quirks in one place:
+  numeric fields arrive as strings, conversions hide in an `actions` array keyed by
+  event name, budgets are in minor units, and an absent metric means zero. Ratios are
+  recomputed from counters so they survive aggregation.
+- **`src/pages/Connection.tsx`** — the Live Data page. Verifies credentials, pulls a
+  real 30-day figure to check against Ads Manager, and explains Meta's error codes.
+
+Without a backend the client throws a recognisable "not configured" error and the app
+falls back to sample data, so the same build runs on GitHub Pages as a static demo.
+
+### Setup
+
+One secret, set in Vercel → Project → Settings → Environment Variables:
+
+| Key | Value |
+| --- | --- |
+| `META_ACCESS_TOKEN` | System User token, `ads_read` scope only |
+
+Then **redeploy** — Vercel reads environment variables at build time, so a deployment
+created before the variable existed will not see it. This is the single most common
+reason setup appears to fail.
+
+The ad account is set in `api/meta.ts` rather than an env var: an account ID is
+configuration, not a credential. Override it with `META_AD_ACCOUNT_ID` if needed.
+
+`ads_read` is read-only by design. A leaked token could expose numbers but could not
+spend money or change campaigns. Never grant `ads_management`, and never put a token
+in source code — this repo is public.
+
+### Extending it to the rest of the dashboard
+
+Live data currently drives the Live Data page. The remaining pages still read the
+sample data in `src/data/`, and each one moves across the same way:
+
+1. **Entities** — `fetchEntities('campaigns' | 'adsets' | 'ads')` returns status,
+   objective and budget. Join them to `fetchInsights(level)` by id; insights carry
+   the metrics, the entity edges carry everything else.
+2. **Daily series** — `fetchInsights('account', { daily: true })` returns one row per
+   day, which is the shape `TimeSeriesPoint` and the trend charts expect.
 3. **Breakdowns** — `breakdownData.ts` maps one-to-one onto the API's `breakdowns`
-   parameter (`age`, `gender`, `publisher_platform`, `platform_position`,
-   `impression_device`, `country`, `region`, `hourly_stats_aggregated_by_advertiser_time_zone`).
-   Feed each response row through `buildRow` and the derived ratios stay correct.
-4. **Comparison periods** — the KPI cards expect a previous-period value per metric;
-   issue the same insights call with the shifted `time_range`.
-5. **Rate limits and volume** — request `time_increment: 1` only where the daily series
-   is needed, and use the async insights job (`POST` then poll `report_run_id`) for
-   large date ranges. Keep the derived layers (`performanceData`, `engineData`) as they
-   are — they read from the entity tables and need no API knowledge.
+   parameter (`age`, `gender`, `publisher_platform,platform_position`,
+   `impression_device`, `country`, `region`,
+   `hourly_stats_aggregated_by_advertiser_time_zone`). Feed each row through
+   `normalizeRow`, then `buildRow`, and the derived ratios stay correct.
+4. **Comparison periods** — KPI cards need a previous-period value per metric; issue
+   the same call with a shifted window.
+5. **Volume** — use the async insights job (`POST`, then poll `report_run_id`) for
+   long date ranges on large accounts. The derived layers (`performanceData`,
+   `engineData`) need no changes at all: they read the entity tables and know nothing
+   about the API.
+
+### If purchases come back as zero
+
+Meta reports the same conversion under different event names depending on account
+setup. `PURCHASE_ACTIONS` in `src/lib/metaApi.ts` tries
+`offsite_conversion.fb_pixel_purchase`, then `omni_purchase`, then `purchase`. If Ads
+Manager shows purchases and the dashboard does not, your event uses a name outside
+that list — add it. The Live Data page flags this case explicitly.
 
 ### Thresholds worth reviewing
 
