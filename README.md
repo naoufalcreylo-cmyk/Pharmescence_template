@@ -41,29 +41,25 @@ npm run build    # typecheck + production bundle into dist/
 The repo ships with `.github/workflows/deploy.yml`, which rebuilds and republishes
 the site on every push to `main`. One-time setup:
 
-1. **Create an empty repo** at [github.com/new](https://github.com/new). Name it
-   `pharmescence-dashboard`. Leave "Add a README", ".gitignore" and "license"
-   **unchecked** — this project already has them, and checking them causes a
-   conflict on your first push. It must be **Public** unless you have GitHub Pro,
-   because Pages on private repos is a paid feature.
+This project deploys to
+[naoufalcreylo-cmyk/Pharmescence_template](https://github.com/naoufalcreylo-cmyk/Pharmescence_template).
 
-2. **Push the code** (replace `YOUR-USERNAME`):
+1. **Push the code.** The remote is already configured, so this is just:
 
    ```bash
-   git remote add origin https://github.com/YOUR-USERNAME/pharmescence-dashboard.git
    git push -u origin main
    ```
 
-3. **Turn Pages on**: repo → **Settings** → **Pages** → under "Build and deployment",
+2. **Turn Pages on**: repo → **Settings** → **Pages** → under "Build and deployment",
    set **Source** to **GitHub Actions**. This step is easy to miss and the deploy
    fails without it — the default is "Deploy from a branch", which is the old method
    and does not work with this workflow.
 
-4. Watch the **Actions** tab. The first run takes 1–2 minutes. When it goes green
-   your dashboard is live at:
+3. Watch the **Actions** tab. The first run takes 1–2 minutes. When it goes green
+   the dashboard is live at:
 
    ```
-   https://YOUR-USERNAME.github.io/pharmescence-dashboard/
+   https://naoufalcreylo-cmyk.github.io/Pharmescence_template/
    ```
 
 After setup, deploying is just `git push`.
