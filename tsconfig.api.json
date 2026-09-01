@@ -1,0 +1,16 @@
+{
+  "//": "Vercel compiles api/ separately from the Vite app, so it sits outside the main tsconfig's `include`. This config exists so `npm run typecheck:api` can still catch errors in it before deploying.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "isolatedModules": true
+  },
+  "include": ["api"]
+}

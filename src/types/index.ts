@@ -220,7 +220,8 @@ export type NavPage =
   | 'ratios'
   | 'profitability'
   | 'alerts'
-  | 'reports';
+  | 'reports'
+  | 'connection';
 
 // ─── Budget Engine ────────────────────────────────────────────────────────────
 export type RecommendationType =

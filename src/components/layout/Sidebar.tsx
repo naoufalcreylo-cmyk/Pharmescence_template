@@ -2,7 +2,7 @@ import { clsx } from 'clsx';
 import {
   LayoutDashboard, Megaphone, Users, Image, GitBranch, LineChart, DollarSign,
   Zap, Bell, FileText, ChevronRight, TrendingUp, Activity, Brain, Sigma,
-  Layers, Globe2, LayoutGrid, Clock, Trophy, AlertTriangle, Sparkles,
+  Layers, Globe2, LayoutGrid, Clock, Trophy, AlertTriangle, Sparkles, PlugZap,
 } from 'lucide-react';
 import { alerts } from '../../data/mockData';
 import type { NavPage } from '../../types';
@@ -75,6 +75,7 @@ const NAV: NavSection[] = [
     items: [
       { id: 'alerts', label: 'Alerts', icon: Bell, badge: openAlerts > 0 ? String(openAlerts) : undefined },
       { id: 'reports', label: 'Reports', icon: FileText },
+      { id: 'connection', label: 'Live Data', icon: PlugZap },
     ],
   },
 ];

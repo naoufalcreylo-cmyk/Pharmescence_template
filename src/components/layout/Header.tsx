@@ -28,6 +28,7 @@ const pageTitles: Record<NavPage, string> = {
   profitability: 'Profitability Dashboard',
   alerts: 'Alerts & Monitoring',
   reports: 'Reports & Export',
+  connection: 'Live Data Connection',
 };
 
 const DATE_PRESETS = [

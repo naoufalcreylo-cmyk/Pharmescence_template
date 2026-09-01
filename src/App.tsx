@@ -26,6 +26,7 @@ import { Ratios } from './pages/Ratios';
 import { Profitability } from './pages/Profitability';
 import { Alerts } from './pages/Alerts';
 import { Reports } from './pages/Reports';
+import { Connection } from './pages/Connection';
 
 import type { NavPage } from './types';
 
@@ -93,6 +94,7 @@ function Dashboard() {
       case 'profitability': return <Profitability selectedDays={filters.days} />;
       case 'alerts': return <Alerts />;
       case 'reports': return <Reports selectedDays={filters.days} />;
+      case 'connection': return <Connection />;
       default: return <Overview selectedDays={filters.days} />;
     }
   };
