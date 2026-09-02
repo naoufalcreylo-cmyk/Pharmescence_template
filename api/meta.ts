@@ -223,6 +223,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      /**
+       * Everything the dashboard needs for one date range, in one response.
+       *
+       * The client used to issue these eleven requests itself, which meant
+       * eleven concurrent serverless invocations per page load. That is fragile
+       * — concurrency limits and per-invocation cold starts turn one slow edge
+       * into a total failure, and a platform-level rejection comes back as an
+       * HTML error page rather than JSON, so the client cannot even report why.
+       *
+       * Fanning out here instead costs one invocation, runs the Meta calls
+       * server-side where latency is far lower, and lets a single failing edge
+       * be reported per-key rather than sinking the whole load.
+       */
+      case 'bundle': {
+        const prevSince = one(q.prevSince);
+        const prevUntil = one(q.prevUntil);
+        const prevRange =
+          prevSince && prevUntil && isoDate.test(prevSince) && isoDate.test(prevUntil)
+            ? JSON.stringify({ since: prevSince, until: prevUntil })
+            : timeRange;
+
+        const entityUrl = (edge: string, fields: string) => {
+          const u = new URL(`${GRAPH}/${accountId}/${edge}`);
+          u.searchParams.set('fields', fields);
+          u.searchParams.set('limit', edge === 'ads' ? '300' : '200');
+          u.searchParams.set('access_token', token);
+          return u.toString();
+        };
+
+        const insightsUrl = (level: string, range: string, daily = false) => {
+          const u = new URL(`${GRAPH}/${accountId}/insights`);
+          u.searchParams.set('level', level);
+          u.searchParams.set('fields', LEVEL_FIELDS[level]);
+          u.searchParams.set('time_range', range);
+          u.searchParams.set('action_attribution_windows', JSON.stringify(['7d_click', '1d_view']));
+          u.searchParams.set('limit', '500');
+          if (daily) u.searchParams.set('time_increment', '1');
+          u.searchParams.set('access_token', token);
+          return u.toString();
+        };
+
+        const jobs: [string, string][] = [
+          ['campaigns', entityUrl('campaigns', 'id,name,status,effective_status,objective,daily_budget,lifetime_budget,start_time,stop_time')],
+          ['adsets', entityUrl('adsets', 'id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,billing_event,targeting')],
+          ['ads', entityUrl('ads', 'id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url,object_type,title,body,call_to_action_type}')],
+          ['campaignInsights', insightsUrl('campaign', timeRange)],
+          ['adSetInsights', insightsUrl('adset', timeRange)],
+          ['adInsights', insightsUrl('ad', timeRange)],
+          ['daily', insightsUrl('account', timeRange, true)],
+          ['dailyPrev', insightsUrl('account', prevRange, true)],
+          ['campaignPrev', insightsUrl('campaign', prevRange)],
+          ['adSetPrev', insightsUrl('adset', prevRange)],
+          ['adPrev', insightsUrl('ad', prevRange)],
+        ];
+
+        const settled = await Promise.allSettled(jobs.map(([, u]) => fetchAllPages(u)));
+
+        const bundle: Record<string, unknown[]> = {};
+        const errors: Record<string, string> = {};
+        settled.forEach((r, i) => {
+          const key = jobs[i][0];
+          if (r.status === 'fulfilled') bundle[key] = r.value;
+          else {
+            bundle[key] = [];
+            errors[key] = (r.reason as Error).message;
+          }
+        });
+
+        res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+        return res.status(200).json({
+          configured: true,
+          connected: Object.keys(errors).length < jobs.length,
+          accountId,
+          bundle,
+          errors: Object.keys(errors).length ? errors : undefined,
+        });
+      }
+
       case 'insights': {
         const level = one(q.level) ?? 'account';
         if (!VALID_LEVELS.has(level)) {

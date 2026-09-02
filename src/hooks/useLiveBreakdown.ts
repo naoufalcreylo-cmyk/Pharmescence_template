@@ -119,6 +119,30 @@ async function loadRequest(key: RequestKey, since: string, until: string, nonce:
   return promise;
 }
 
+/**
+ * Run tasks with a concurrency cap.
+ *
+ * The Breakdowns page needs six requests. Firing them at once means six
+ * simultaneous serverless invocations, which is what made the main dashboard
+ * load fail — the platform rejects the excess with an HTML error page rather
+ * than JSON. Two at a time keeps it well inside any limit and is still fast,
+ * since these are network-bound.
+ */
+async function runLimited<T>(tasks: (() => Promise<T>)[], limit = 2): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let next = 0;
+
+  const worker = async () => {
+    while (next < tasks.length) {
+      const i = next++;
+      results[i] = await tasks[i]();
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
+}
+
 export interface LiveBreakdownState {
   data: BreakdownBundle;
   loading: boolean;
@@ -154,7 +178,9 @@ export function useLiveBreakdown(keys: RequestKey[]): LiveBreakdownState {
     setLoading(true);
     setError(null);
 
-    Promise.all(keyList.split(',').map(k => loadRequest(k as RequestKey, range.since, range.until, nonce)))
+    runLimited(
+      keyList.split(',').map(k => () => loadRequest(k as RequestKey, range.since, range.until, nonce)),
+    )
       .then(parts => {
         if (cancelled) return;
         setData(parts.reduce<BreakdownBundle>((acc, p) => ({ ...acc, ...p }), { ...EMPTY }));

@@ -281,13 +281,22 @@ async function call<T>(params: Record<string, string>): Promise<ApiEnvelope<T>> 
   }
 
   // A static host answers /api/* with its 404 page, which is HTML, not JSON.
+  // So does a platform-level rejection — a concurrency limit, a timeout, a
+  // crashed invocation. Those are very different problems, and reporting both
+  // as "no backend" hides real failures, so the status code decides.
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) {
+    if (response.status === 404) {
+      throw new MetaApiError(
+        'No backend found at /api/meta. Deploy to Vercel to enable live data.',
+        undefined,
+        undefined,
+        true,
+      );
+    }
     throw new MetaApiError(
-      'No backend found at /api/meta. Deploy to Vercel to enable live data.',
-      undefined,
-      undefined,
-      true,
+      `The /api/meta function returned ${response.status} ${response.statusText || ''} instead of JSON. ` +
+        'This is the hosting platform rejecting the request, not Meta — usually a timeout or a concurrency limit.',
     );
   }
 
@@ -364,6 +373,68 @@ export async function fetchInsightsRaw(
 ): Promise<MetaInsightRow[]> {
   const body = await call<MetaInsightRow[]>(queryParams(level, opts));
   return body.data ?? [];
+}
+
+export interface DashboardBundle {
+  campaigns: MetaEntity[];
+  adsets: MetaEntity[];
+  ads: MetaEntity[];
+  campaignInsights: MetaInsightRow[];
+  adSetInsights: MetaInsightRow[];
+  adInsights: MetaInsightRow[];
+  daily: MetaInsightRow[];
+  dailyPrev: MetaInsightRow[];
+  campaignPrev: MetaInsightRow[];
+  adSetPrev: MetaInsightRow[];
+  adPrev: MetaInsightRow[];
+}
+
+export interface BundleResult {
+  bundle: DashboardBundle;
+  /** Per-edge failures. The rest of the bundle is still usable. */
+  errors?: Record<string, string>;
+}
+
+/**
+ * Everything the dashboard needs, in one round trip.
+ *
+ * Replaces eleven parallel browser requests with a single call that fans out
+ * server-side, where the Meta calls are faster and a platform concurrency limit
+ * cannot turn one slow edge into a total failure.
+ */
+export async function fetchDashboardBundle(q: {
+  since: string;
+  until: string;
+  prevSince: string;
+  prevUntil: string;
+}): Promise<BundleResult> {
+  const body = await call<never>({
+    resource: 'bundle',
+    since: q.since,
+    until: q.until,
+    prevSince: q.prevSince,
+    prevUntil: q.prevUntil,
+  });
+
+  const raw = (body as { bundle?: Partial<DashboardBundle> }).bundle ?? {};
+  const empty = <T,>(v: T[] | undefined): T[] => v ?? [];
+
+  return {
+    bundle: {
+      campaigns: empty(raw.campaigns),
+      adsets: empty(raw.adsets),
+      ads: empty(raw.ads),
+      campaignInsights: empty(raw.campaignInsights),
+      adSetInsights: empty(raw.adSetInsights),
+      adInsights: empty(raw.adInsights),
+      daily: empty(raw.daily),
+      dailyPrev: empty(raw.dailyPrev),
+      campaignPrev: empty(raw.campaignPrev),
+      adSetPrev: empty(raw.adSetPrev),
+      adPrev: empty(raw.adPrev),
+    },
+    errors: (body as { errors?: Record<string, string> }).errors,
+  };
 }
 
 export interface ReachableAdAccount {

@@ -7,7 +7,7 @@ import {
   ads as mockAds,
   timeSeriesData as mockTimeSeries,
 } from '../data/mockData';
-import { fetchEntities, fetchInsights, MetaApiError } from '../lib/metaApi';
+import { fetchDashboardBundle, normalizeRow, MetaApiError } from '../lib/metaApi';
 import { mapCampaigns, mapAdSets, mapAds, mapTimeSeries } from '../data/liveMappers';
 import { previousRange } from '../lib/dateRanges';
 import type { DateRange } from '../lib/dateRanges';
@@ -68,82 +68,67 @@ export function DataProvider({ children, range }: { children: ReactNode; range: 
       setLoading(true);
       setError(null);
 
-      // Issued together rather than in sequence: the entity edges and the
-      // insight edges are independent, and each reaches Meta through its own
-      // serverless invocation, so concurrency costs nothing extra.
-      //
-      // allSettled, not all: one edge failing (an unsupported field, a
-      // per-request throttle) must not blank the entire dashboard. Whatever
-      // arrived is shown, and the failures are reported rather than swallowed.
-      const results = await Promise.allSettled([
-        fetchEntities('campaigns'),
-        fetchEntities('adsets'),
-        fetchEntities('ads'),
-        fetchInsights('campaign', { since, until }),
-        fetchInsights('adset', { since, until }),
-        fetchInsights('ad', { since, until }),
-        fetchInsights('account', { since, until, daily: true }),
-        // The previous window is fetched as its own daily series rather than
-        // by over-fetching one long series: calendar presets like "This month"
-        // have a previous period that is not simply N more days back.
-        fetchInsights('account', { since: prev.since, until: prev.until, daily: true }),
-        fetchInsights('campaign', { since: prev.since, until: prev.until }),
-        fetchInsights('adset', { since: prev.since, until: prev.until }),
-        fetchInsights('ad', { since: prev.since, until: prev.until }),
-      ]);
+      // One request, fanned out server-side. Eleven parallel browser requests
+      // meant eleven concurrent serverless invocations per page load, and a
+      // platform-level rejection of any of them came back as an HTML error page
+      // rather than JSON — which the client could not even report.
+      try {
+        const { bundle, errors } = await fetchDashboardBundle({
+          since,
+          until,
+          // Calendar presets like "This month" have a previous period that is
+          // not simply N more days back, so it is computed here and sent along.
+          prevSince: prev.since,
+          prevUntil: prev.until,
+        });
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      const at = <T,>(i: number, fallback: T): T =>
-        results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<T>).value : fallback;
+        const campaignNames = new Map(bundle.campaigns.map(c => [c.id, c.name]));
+        const adSetNames = new Map(bundle.adsets.map(a => [a.id, a.name]));
+        const rows = (list: typeof bundle.campaignInsights) => list.map(normalizeRow);
 
-      const failures = results
-        .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-        .map(r => r.reason as MetaApiError);
+        const liveCampaigns = mapCampaigns(
+          bundle.campaigns, rows(bundle.campaignInsights), rows(bundle.campaignPrev),
+        );
+        const liveAdSets = mapAdSets(
+          bundle.adsets, rows(bundle.adSetInsights), rows(bundle.adSetPrev), campaignNames,
+        );
+        const liveAds = mapAds(
+          bundle.ads, rows(bundle.adInsights), rows(bundle.adPrev), adSetNames, campaignNames,
+        );
 
-      // No backend or no token at all: the expected static-demo case, and not a
-      // failure worth alarming the user about.
-      if (failures.length === results.length) {
-        const first = failures[0];
+        // Previous days first, then current: the KPI helpers read the comparison
+        // period as `slice(-days*2, -days)` of one continuous series.
+        const liveSeries = [...mapTimeSeries(rows(bundle.dailyPrev)), ...mapTimeSeries(rows(bundle.daily))];
+
+        // Reaching Meta at all means the data is real, even when the window is
+        // empty. Falling back to sample here would quietly replace "no delivery
+        // yet today" with fabricated numbers — the exact failure the data-source
+        // badge exists to prevent. Empty states are the honest answer.
+        setState({
+          campaigns: liveCampaigns,
+          adSets: liveAdSets,
+          ads: liveAds,
+          timeSeries: liveSeries,
+          source: 'live',
+        });
+
+        const failed = errors ? Object.entries(errors) : [];
+        setError(
+          failed.length > 0
+            ? `${failed.length} Meta request${failed.length > 1 ? 's' : ''} failed (${failed.map(([k]) => k).join(', ')}). First error: ${failed[0][1]}`
+            : null,
+        );
+      } catch (err) {
+        if (cancelled) return;
+        const e = err as MetaApiError;
         setState({ ...SAMPLE, source: 'sample' });
-        setError(first?.notConfigured ? null : (first?.message ?? 'Could not reach the Meta API.'));
-        setLoading(false);
-        return;
+        // No backend or no token is the expected static-demo case, not a failure
+        // worth alarming the user about.
+        setError(e.notConfigured ? null : e.message);
       }
 
-      const campaignEntities = at(0, [] as Awaited<ReturnType<typeof fetchEntities>>);
-      const adSetEntities = at(1, [] as Awaited<ReturnType<typeof fetchEntities>>);
-      const adEntities = at(2, [] as Awaited<ReturnType<typeof fetchEntities>>);
-      const empty: Awaited<ReturnType<typeof fetchInsights>> = [];
-
-      const campaignNames = new Map(campaignEntities.map(c => [c.id, c.name]));
-      const adSetNames = new Map(adSetEntities.map(a => [a.id, a.name]));
-
-      const liveCampaigns = mapCampaigns(campaignEntities, at(3, empty), at(8, empty));
-      const liveAdSets = mapAdSets(adSetEntities, at(4, empty), at(9, empty), campaignNames);
-      const liveAds = mapAds(adEntities, at(5, empty), at(10, empty), adSetNames, campaignNames);
-
-      // Previous days first, then current: the KPI helpers read the comparison
-      // period as `slice(-days*2, -days)` of one continuous series.
-      const liveSeries = [...mapTimeSeries(at(7, empty)), ...mapTimeSeries(at(6, empty))];
-
-      // Reaching Meta at all means the data is real, even when the window is
-      // empty. Falling back to sample here would quietly replace "no delivery
-      // yet today" with fabricated numbers — the exact failure this badge exists
-      // to prevent. Empty states are the honest answer.
-      setState({
-        campaigns: liveCampaigns,
-        adSets: liveAdSets,
-        ads: liveAds,
-        timeSeries: liveSeries,
-        source: 'live',
-      });
-
-      setError(
-        failures.length > 0
-          ? `${failures.length} of ${results.length} Meta requests failed. First error: ${failures[0].message}`
-          : null,
-      );
       setLoading(false);
     }
 
