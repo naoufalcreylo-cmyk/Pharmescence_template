@@ -3,5 +3,11 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "functions": {
+    "api/*.ts": {
+      "//": "The bundle endpoint makes eleven Meta calls, three at a time, and retries any that Meta throttles. The 10s default is not enough headroom for the retry path on a slow response.",
+      "maxDuration": 30
+    }
+  }
 }

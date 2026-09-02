@@ -103,6 +103,44 @@ interface MetaError {
   fbtrace_id?: string;
 }
 
+/** Meta's throttling codes. Retrying these works; retrying anything else does not. */
+const RATE_LIMIT_CODES = new Set([4, 17, 32, 613]);
+
+function isRateLimited(err: unknown): boolean {
+  const e = err as { metaCode?: number; message?: string };
+  if (e?.metaCode !== undefined && RATE_LIMIT_CODES.has(e.metaCode)) return true;
+  return /request limit|rate limit|too many calls|reduce the amount of data/i.test(e?.message ?? '');
+}
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * Run tasks with a concurrency cap.
+ *
+ * Firing all eleven Meta calls at once trips "User request limit reached" —
+ * Meta throttles bursts per user, not just total volume over time. Three at a
+ * time stays under it while keeping the whole bundle well inside the function's
+ * execution budget.
+ */
+async function runLimited<T>(tasks: (() => Promise<T>)[], limit = 3): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let next = 0;
+
+  const worker = async () => {
+    while (next < tasks.length) {
+      const i = next++;
+      try {
+        results[i] = { status: 'fulfilled', value: await tasks[i]() };
+      } catch (reason) {
+        results[i] = { status: 'rejected', reason };
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
+}
+
 /**
  * Fetch one Graph API URL, following `paging.next` so callers get the complete
  * set. Capped: a runaway loop against a large account would blow the function's
@@ -278,7 +316,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ['adPrev', insightsUrl('ad', prevRange)],
         ];
 
-        const settled = await Promise.allSettled(jobs.map(([, u]) => fetchAllPages(u)));
+        /**
+         * Throttling is transient by definition, so a rate-limited call is
+         * retried after a short pause rather than reported as a failure. Two
+         * attempts with a growing delay clears it in practice; beyond that the
+         * account is genuinely over its limit and waiting longer would only
+         * burn the function's execution budget.
+         */
+        const withRetry = (u: string) => async (): Promise<unknown[]> => {
+          for (let attempt = 0; ; attempt++) {
+            try {
+              return await fetchAllPages(u);
+            } catch (err) {
+              if (attempt >= 2 || !isRateLimited(err)) throw err;
+              await sleep(600 * (attempt + 1) ** 2);
+            }
+          }
+        };
+
+        const settled = await runLimited(jobs.map(([, u]) => withRetry(u)));
 
         const bundle: Record<string, unknown[]> = {};
         const errors: Record<string, string> = {};
